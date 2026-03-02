@@ -35,13 +35,12 @@ public partial class SpriteSheetImportWindow : Window
             return;
         }
 
-        _sourceImage = LoadBitmap(dialog.FileName);
-        SourceImageView.Source = _sourceImage;
+        LoadSourceImage(LoadBitmap(dialog.FileName));
+    }
 
-        ImageScrollViewer.Visibility = Visibility.Visible;
-        LoadPanel.Visibility = Visibility.Collapsed;
-        ClearSelection();
-        Keyboard.Focus(this);
+    private void LoadFromClipboardButton_Click(object sender, RoutedEventArgs e)
+    {
+        TryLoadFromClipboard(showMessageOnFailure: true);
     }
 
     private static BitmapImage LoadBitmap(string path)
@@ -112,6 +111,13 @@ public partial class SpriteSheetImportWindow : Window
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.V && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+        {
+            TryLoadFromClipboard(showMessageOnFailure: true);
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key != Key.Space)
         {
             return;
@@ -219,5 +225,59 @@ public partial class SpriteSheetImportWindow : Window
         _selectionDip = Rect.Empty;
         SelectionRectangle.Visibility = Visibility.Collapsed;
         SelectionHint.Visibility = Visibility.Collapsed;
+    }
+
+    private void LoadSourceImage(BitmapSource image)
+    {
+        if (image is Freezable freezable && freezable.CanFreeze && !freezable.IsFrozen)
+        {
+            freezable.Freeze();
+        }
+
+        _sourceImage = image;
+        SourceImageView.Source = _sourceImage;
+
+        ImageScrollViewer.Visibility = Visibility.Visible;
+        LoadPanel.Visibility = Visibility.Collapsed;
+        ClearSelection();
+        Keyboard.Focus(this);
+    }
+
+    private void TryLoadFromClipboard(bool showMessageOnFailure)
+    {
+        try
+        {
+            if (!Clipboard.ContainsImage())
+            {
+                if (showMessageOnFailure)
+                {
+                    MessageBox.Show(this, "클립보드에 이미지가 없습니다.", "클립보드 불러오기", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+
+                return;
+            }
+
+            var clipboardImage = Clipboard.GetImage();
+            if (clipboardImage is null)
+            {
+                if (showMessageOnFailure)
+                {
+                    MessageBox.Show(this, "클립보드 이미지를 읽을 수 없습니다.", "클립보드 불러오기", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+
+                return;
+            }
+
+            var copied = new WriteableBitmap(clipboardImage);
+            copied.Freeze();
+            LoadSourceImage(copied);
+        }
+        catch
+        {
+            if (showMessageOnFailure)
+            {
+                MessageBox.Show(this, "클립보드 접근 중 오류가 발생했습니다.", "클립보드 불러오기", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
     }
 }

@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Microsoft.Win32;
@@ -16,6 +17,8 @@ namespace FrameForge;
 
 public partial class MainWindow : Window, INotifyPropertyChanged
 {
+    private const string FrameDragDataFormat = "FrameForge.AnimationFrame";
+
     private static readonly HashSet<string> SupportedImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tif", ".tiff", ".webp"
@@ -25,8 +28,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private SpriteSheetImportWindow? _sheetImportWindow;
     private int _selectedFrameIndex = -1;
     private bool _isPlaying;
+    private bool _isLoopEnabled;
     private double _zoomFactor = 1.0;
     private double _thumbnailHeight = 120;
+    private Point _thumbnailDragStartPoint;
+    private AnimationFrame? _thumbnailDragSourceFrame;
 
     public MainWindow()
     {
@@ -76,6 +82,21 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         : "Add frame images in the bottom area to show the current frame here.";
 
     public bool HasFrames => Frames.Count > 0;
+
+    public bool IsLoopEnabled
+    {
+        get => _isLoopEnabled;
+        set
+        {
+            if (_isLoopEnabled == value)
+            {
+                return;
+            }
+
+            _isLoopEnabled = value;
+            OnPropertyChanged();
+        }
+    }
 
     public bool IsPlaying
     {
@@ -230,6 +251,87 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         SelectedFrameIndex = next;
     }
 
+    private void RemoveSelectedFrame()
+    {
+        if (!HasFrames || SelectedFrameIndex < 0 || SelectedFrameIndex >= Frames.Count)
+        {
+            return;
+        }
+
+        var removedIndex = SelectedFrameIndex;
+        Frames.RemoveAt(removedIndex);
+        OnPropertyChanged(nameof(HasFrames));
+
+        if (Frames.Count == 0)
+        {
+            StopPlayback();
+            SelectedFrameIndex = -1;
+            return;
+        }
+
+        SelectedFrameIndex = Math.Clamp(removedIndex, 0, Frames.Count - 1);
+    }
+
+    private void MoveFrameByInsertionIndex(int sourceIndex, int insertionIndex)
+    {
+        if (sourceIndex < 0 || sourceIndex >= Frames.Count)
+        {
+            return;
+        }
+
+        var targetInsertionIndex = Math.Clamp(insertionIndex, 0, Frames.Count);
+        var targetIndex = targetInsertionIndex > sourceIndex ? targetInsertionIndex - 1 : targetInsertionIndex;
+
+        if (targetIndex == sourceIndex)
+        {
+            return;
+        }
+
+        var frame = Frames[sourceIndex];
+        Frames.RemoveAt(sourceIndex);
+        Frames.Insert(targetIndex, frame);
+        SelectedFrameIndex = targetIndex;
+    }
+
+    private int GetThumbnailInsertionIndexFromDropPosition(DragEventArgs e)
+    {
+        if (Frames.Count == 0)
+        {
+            return 0;
+        }
+
+        var dropTarget = FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject);
+        if (dropTarget is null)
+        {
+            var dropPoint = e.GetPosition(ThumbnailList);
+            return dropPoint.X < ThumbnailList.ActualWidth * 0.5 ? 0 : Frames.Count;
+        }
+
+        var index = ThumbnailList.ItemContainerGenerator.IndexFromContainer(dropTarget);
+        if (index < 0)
+        {
+            return Frames.Count;
+        }
+
+        var relativePoint = e.GetPosition(dropTarget);
+        return relativePoint.X >= dropTarget.ActualWidth * 0.5 ? index + 1 : index;
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? current) where T : DependencyObject
+    {
+        while (current is not null)
+        {
+            if (current is T found)
+            {
+                return found;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return null;
+    }
+
     private void TogglePlayback()
     {
         if (!HasFrames)
@@ -280,21 +382,39 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void PlaybackTimer_Tick(object? sender, EventArgs e)
     {
-        MoveSelection(1, wrap: true);
+        if (!HasFrames)
+        {
+            StopPlayback();
+            return;
+        }
+
+        if (IsLoopEnabled)
+        {
+            MoveSelection(1, wrap: true);
+            return;
+        }
+
+        if (SelectedFrameIndex >= Frames.Count - 1)
+        {
+            StopPlayback();
+            return;
+        }
+
+        MoveSelection(1, wrap: false);
     }
 
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Left)
         {
-            MoveSelection(-1, wrap: false);
+            MoveSelection(-1, wrap: IsLoopEnabled);
             e.Handled = true;
             return;
         }
 
         if (e.Key == Key.Right)
         {
-            MoveSelection(1, wrap: false);
+            MoveSelection(1, wrap: IsLoopEnabled);
             e.Handled = true;
             return;
         }
@@ -303,17 +423,24 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             TogglePlayback();
             e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Delete)
+        {
+            RemoveSelectedFrame();
+            e.Handled = true;
         }
     }
 
     private void PreviousFrameButton_Click(object sender, RoutedEventArgs e)
     {
-        MoveSelection(-1, wrap: false);
+        MoveSelection(-1, wrap: IsLoopEnabled);
     }
 
     private void NextFrameButton_Click(object sender, RoutedEventArgs e)
     {
-        MoveSelection(1, wrap: false);
+        MoveSelection(1, wrap: IsLoopEnabled);
     }
 
     private void PlayPauseButton_Click(object sender, RoutedEventArgs e)
@@ -381,21 +508,71 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return;
         }
 
+        if (e.Data.GetDataPresent(FrameDragDataFormat))
+        {
+            e.Effects = DragDropEffects.Move;
+            e.Handled = true;
+            return;
+        }
+
         e.Effects = DragDropEffects.None;
         e.Handled = true;
     }
 
     private void ThumbnailList_Drop(object sender, DragEventArgs e)
     {
-        if (!e.Data.GetDataPresent(DataFormats.FileDrop))
+        if (e.Data.GetDataPresent(FrameDragDataFormat)
+            && e.Data.GetData(FrameDragDataFormat) is AnimationFrame draggedFrame)
+        {
+            var sourceIndex = Frames.IndexOf(draggedFrame);
+            var insertionIndex = GetThumbnailInsertionIndexFromDropPosition(e);
+            MoveFrameByInsertionIndex(sourceIndex, insertionIndex);
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Data.GetDataPresent(DataFormats.FileDrop)
+            && e.Data.GetData(DataFormats.FileDrop) is string[] droppedFiles)
+        {
+            AddFramesFromPaths(droppedFiles);
+            e.Handled = true;
+        }
+    }
+
+    private void ThumbnailList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _thumbnailDragStartPoint = e.GetPosition(ThumbnailList);
+
+        var clickedItem = FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject);
+        _thumbnailDragSourceFrame = clickedItem?.DataContext as AnimationFrame;
+
+        if (_thumbnailDragSourceFrame is not null)
+        {
+            ThumbnailList.SelectedItem = _thumbnailDragSourceFrame;
+        }
+    }
+
+    private void ThumbnailList_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || _thumbnailDragSourceFrame is null)
         {
             return;
         }
 
-        if (e.Data.GetData(DataFormats.FileDrop) is string[] droppedFiles)
+        var currentPoint = e.GetPosition(ThumbnailList);
+        var delta = _thumbnailDragStartPoint - currentPoint;
+
+        if (Math.Abs(delta.X) < SystemParameters.MinimumHorizontalDragDistance
+            && Math.Abs(delta.Y) < SystemParameters.MinimumVerticalDragDistance)
         {
-            AddFramesFromPaths(droppedFiles);
+            return;
         }
+
+        var dragData = new DataObject();
+        dragData.SetData(FrameDragDataFormat, _thumbnailDragSourceFrame);
+
+        DragDrop.DoDragDrop(ThumbnailList, dragData, DragDropEffects.Move);
+        _thumbnailDragSourceFrame = null;
     }
 
     private void ThumbnailList_SizeChanged(object sender, SizeChangedEventArgs e)

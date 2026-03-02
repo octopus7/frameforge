@@ -90,6 +90,23 @@
               Foreground="#F2F2F2"
               BorderBrush="#2F2F2F"
               BorderThickness="0,0,0,1">
+            <Menu.Resources>
+                <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="#222222" />
+                <SolidColorBrush x:Key="{x:Static SystemColors.MenuTextBrushKey}" Color="#F2F2F2" />
+                <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#222222" />
+                <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#F2F2F2" />
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#35506A" />
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#FFFFFF" />
+
+                <Style TargetType="MenuItem">
+                    <Setter Property="Foreground" Value="#F2F2F2" />
+                    <Setter Property="Background" Value="#222222" />
+                    <Setter Property="BorderBrush" Value="#2F2F2F" />
+                    <Setter Property="BorderThickness" Value="1" />
+                    <Setter Property="Padding" Value="8,4" />
+                </Style>
+            </Menu.Resources>
+
             <MenuItem Header="파일">
                 <MenuItem Header="단일 이미지에서 시트 가져오기"
                           Click="ImportSingleImageSheetMenuItem_Click" />
@@ -236,6 +253,13 @@
                               Data="M8,2 V14 M2,8 H14" />
                     </Button>
 
+                    <CheckBox Margin="12,0,0,0"
+                              VerticalAlignment="Center"
+                              Foreground="#D0D0D0"
+                              Content="루프"
+                              IsChecked="{Binding IsLoopEnabled}"
+                              ToolTip="켜면 좌우 이동과 재생이 순환합니다." />
+
                     <TextBlock VerticalAlignment="Center"
                                Margin="10,0,0,0"
                                Foreground="#A8A8A8"
@@ -252,6 +276,8 @@
                          SelectedIndex="{Binding SelectedFrameIndex, Mode=TwoWay}"
                          SelectionChanged="ThumbnailList_SelectionChanged"
                          AllowDrop="True"
+                         PreviewMouseLeftButtonDown="ThumbnailList_PreviewMouseLeftButtonDown"
+                         PreviewMouseMove="ThumbnailList_PreviewMouseMove"
                          PreviewDragOver="ThumbnailList_PreviewDragOver"
                          Drop="ThumbnailList_Drop"
                          SizeChanged="ThumbnailList_SizeChanged"

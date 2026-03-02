@@ -61,30 +61,54 @@
                 </ScrollViewer>
 
                 <Grid x:Name="LoadPanel">
-                    <Button Width="190"
-                            Height="58"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Click="LoadImageButton_Click"
-                            Cursor="Hand"
-                            Background="#2C2C2C"
-                            Foreground="#F3F3F3"
-                            BorderBrush="#4A4A4A">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Path Width="16"
-                                  Height="16"
-                                  Margin="0,0,8,0"
-                                  Stroke="#F3F3F3"
-                                  StrokeThickness="2"
-                                  StrokeStartLineCap="Round"
-                                  StrokeEndLineCap="Round"
-                                  Data="M8,2 V14 M2,8 H14" />
-                            <TextBlock Text="불러오기"
-                                       VerticalAlignment="Center"
-                                       FontSize="14"
-                                       FontWeight="SemiBold" />
-                        </StackPanel>
-                    </Button>
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Button Width="230"
+                                Height="56"
+                                Margin="0,0,0,10"
+                                Click="LoadImageButton_Click"
+                                Cursor="Hand"
+                                Background="#2C2C2C"
+                                Foreground="#F3F3F3"
+                                BorderBrush="#4A4A4A">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Path Width="16"
+                                      Height="16"
+                                      Margin="0,0,8,0"
+                                      Stroke="#F3F3F3"
+                                      StrokeThickness="2"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      Data="M8,2 V14 M2,8 H14" />
+                                <TextBlock Text="파일에서 불러오기"
+                                           VerticalAlignment="Center"
+                                           FontSize="14"
+                                           FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Width="230"
+                                Height="56"
+                                Click="LoadFromClipboardButton_Click"
+                                Cursor="Hand"
+                                Background="#2C2C2C"
+                                Foreground="#F3F3F3"
+                                BorderBrush="#4A4A4A">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Path Width="16"
+                                      Height="16"
+                                      Margin="0,0,8,0"
+                                      Stroke="#F3F3F3"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      Data="M4,3 H12 V14 H4 Z M6,1 H10 M7,6 H10 M7,9 H10" />
+                                <TextBlock Text="클립보드에서 불러오기"
+                                           VerticalAlignment="Center"
+                                           FontSize="14"
+                                           FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                 </Grid>
             </Grid>
         </Border>
