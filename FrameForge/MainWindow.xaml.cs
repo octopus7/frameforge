@@ -17,7 +17,9 @@ namespace FrameForge;
 
 public partial class MainWindow : Window, INotifyPropertyChanged
 {
+    private const string BaseWindowTitle = "FrameForge Tool";
     private const string FrameDragDataFormat = "FrameForge.AnimationFrame";
+    private const string ProjectFileFilter = "FrameForge Project|*.ffproj|All Files|*.*";
 
     private static readonly HashSet<string> SupportedImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -33,6 +35,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private double _thumbnailHeight = 120;
     private Point _thumbnailDragStartPoint;
     private AnimationFrame? _thumbnailDragSourceFrame;
+    private string? _currentProjectPath;
+    private bool _isDirty;
+    private bool _suppressDirtyTracking;
 
     public MainWindow()
     {
@@ -45,6 +50,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         };
         _playbackTimer.Tick += PlaybackTimer_Tick;
 
+        UpdateWindowTitle();
         Loaded += (_, _) => Keyboard.Focus(this);
     }
 
@@ -95,6 +101,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
             _isLoopEnabled = value;
             OnPropertyChanged();
+
+            if (!_suppressDirtyTracking)
+            {
+                MarkDirty();
+            }
         }
     }
 
@@ -173,6 +184,43 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private static bool IsKoreanUiCulture =>
         string.Equals(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName, "ko", StringComparison.OrdinalIgnoreCase);
 
+    private void UpdateWindowTitle()
+    {
+        var projectLabel = string.IsNullOrWhiteSpace(_currentProjectPath)
+            ? "Untitled"
+            : Path.GetFileName(_currentProjectPath);
+        var dirtyMarker = _isDirty ? "*" : string.Empty;
+        Title = $"{BaseWindowTitle} - {projectLabel}{dirtyMarker}";
+    }
+
+    private void MarkDirty()
+    {
+        if (_suppressDirtyTracking || _isDirty)
+        {
+            return;
+        }
+
+        _isDirty = true;
+        UpdateWindowTitle();
+    }
+
+    private void MarkClean()
+    {
+        if (!_isDirty)
+        {
+            return;
+        }
+
+        _isDirty = false;
+        UpdateWindowTitle();
+    }
+
+    private void SetCurrentProjectPath(string? projectPath)
+    {
+        _currentProjectPath = projectPath;
+        UpdateWindowTitle();
+    }
+
     private int NormalizeSelection(int requestedIndex)
     {
         if (Frames.Count == 0)
@@ -213,6 +261,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var normalizedInsertionIndex = Math.Clamp(insertionIndex, 0, Frames.Count);
         Frames.Insert(normalizedInsertionIndex, new AnimationFrame(frameName, image, sourcePath));
         OnPropertyChanged(nameof(HasFrames));
+
+        if (!_suppressDirtyTracking)
+        {
+            MarkDirty();
+        }
+
         return normalizedInsertionIndex;
     }
 
@@ -269,6 +323,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Frames.RemoveAt(removedIndex);
         OnPropertyChanged(nameof(HasFrames));
 
+        if (!_suppressDirtyTracking)
+        {
+            MarkDirty();
+        }
+
         if (Frames.Count == 0)
         {
             StopPlayback();
@@ -298,6 +357,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Frames.RemoveAt(sourceIndex);
         Frames.Insert(targetIndex, frame);
         SelectedFrameIndex = targetIndex;
+
+        if (!_suppressDirtyTracking)
+        {
+            MarkDirty();
+        }
     }
 
     private int GetThumbnailInsertionIndexFromDropPosition(DragEventArgs e)
@@ -413,8 +477,37 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        var modifiers = Keyboard.Modifiers;
 
-        if (Keyboard.Modifiers == ModifierKeys.Control
+        if (modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && key == Key.S)
+        {
+            TrySaveProject(forceSaveAs: true);
+            e.Handled = true;
+            return;
+        }
+
+        if (modifiers == ModifierKeys.Control && key == Key.N)
+        {
+            CreateNewProject();
+            e.Handled = true;
+            return;
+        }
+
+        if (modifiers == ModifierKeys.Control && key == Key.O)
+        {
+            OpenProject();
+            e.Handled = true;
+            return;
+        }
+
+        if (modifiers == ModifierKeys.Control && key == Key.S)
+        {
+            TrySaveProject(forceSaveAs: false);
+            e.Handled = true;
+            return;
+        }
+
+        if (modifiers == ModifierKeys.Control
             && key == Key.V
             && (ThumbnailList.IsKeyboardFocusWithin || ThumbnailList.IsMouseOver)
             && PasteClipboardImagesAfterSelection())
@@ -513,6 +606,204 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (lastInsertedIndex >= 0)
         {
             SelectedFrameIndex = lastInsertedIndex;
+        }
+
+        return true;
+    }
+
+    private void NewProjectMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        CreateNewProject();
+    }
+
+    private void OpenProjectMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        OpenProject();
+    }
+
+    private void SaveProjectMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        TrySaveProject(forceSaveAs: false);
+    }
+
+    private void SaveProjectAsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        TrySaveProject(forceSaveAs: true);
+    }
+
+    private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        Close();
+    }
+
+    private void CreateNewProject()
+    {
+        if (!TryConfirmDiscardUnsavedChanges())
+        {
+            return;
+        }
+
+        _suppressDirtyTracking = true;
+        try
+        {
+            StopPlayback();
+            Frames.Clear();
+            IsLoopEnabled = false;
+            SelectedFrameIndex = -1;
+            OnPropertyChanged(nameof(HasFrames));
+            OnPropertyChanged(nameof(CurrentFrameImage));
+            OnPropertyChanged(nameof(CurrentFrameSummary));
+        }
+        finally
+        {
+            _suppressDirtyTracking = false;
+        }
+
+        SetCurrentProjectPath(null);
+        MarkClean();
+    }
+
+    private void OpenProject()
+    {
+        if (!TryConfirmDiscardUnsavedChanges())
+        {
+            return;
+        }
+
+        var dialog = new OpenFileDialog
+        {
+            CheckFileExists = true,
+            Filter = ProjectFileFilter,
+            DefaultExt = ".ffproj"
+        };
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            TryLoadProject(dialog.FileName);
+        }
+    }
+
+    private bool TryLoadProject(string projectPath)
+    {
+        try
+        {
+            var loadResult = ProjectStorageService.LoadProject(projectPath);
+
+            _suppressDirtyTracking = true;
+            try
+            {
+                StopPlayback();
+                Frames.Clear();
+                foreach (var frame in loadResult.Frames)
+                {
+                    Frames.Add(frame);
+                }
+
+                IsLoopEnabled = loadResult.IsLoopEnabled;
+                SelectedFrameIndex = loadResult.SelectedFrameIndex;
+
+                OnPropertyChanged(nameof(HasFrames));
+                OnPropertyChanged(nameof(CurrentFrameImage));
+                OnPropertyChanged(nameof(CurrentFrameSummary));
+            }
+            finally
+            {
+                _suppressDirtyTracking = false;
+            }
+
+            SetCurrentProjectPath(projectPath);
+            MarkClean();
+
+            if (loadResult.MissingFrameCount > 0)
+            {
+                MessageBox.Show(
+                    this,
+                    $"프로젝트를 열었지만 {loadResult.MissingFrameCount}개의 프레임 파일을 찾지 못해 건너뛰었습니다.",
+                    "프로젝트 열기",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                this,
+                $"프로젝트를 열 수 없습니다.\n{ex.Message}",
+                "프로젝트 열기",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return false;
+        }
+    }
+
+    private bool TrySaveProject(bool forceSaveAs)
+    {
+        var targetProjectPath = _currentProjectPath;
+        if (forceSaveAs || string.IsNullOrWhiteSpace(targetProjectPath))
+        {
+            var dialog = new SaveFileDialog
+            {
+                AddExtension = true,
+                DefaultExt = ".ffproj",
+                Filter = ProjectFileFilter,
+                OverwritePrompt = true,
+                FileName = string.IsNullOrWhiteSpace(targetProjectPath)
+                    ? "project.ffproj"
+                    : Path.GetFileName(targetProjectPath)
+            };
+
+            if (dialog.ShowDialog(this) != true)
+            {
+                return false;
+            }
+
+            targetProjectPath = dialog.FileName;
+        }
+
+        try
+        {
+            ProjectStorageService.SaveProject(targetProjectPath!, Frames, IsLoopEnabled, SelectedFrameIndex);
+            SetCurrentProjectPath(targetProjectPath);
+            MarkClean();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                this,
+                $"프로젝트를 저장할 수 없습니다.\n{ex.Message}",
+                "프로젝트 저장",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return false;
+        }
+    }
+
+    private bool TryConfirmDiscardUnsavedChanges()
+    {
+        if (!_isDirty)
+        {
+            return true;
+        }
+
+        var result = MessageBox.Show(
+            this,
+            "저장되지 않은 변경 사항이 있습니다. 저장하시겠습니까?",
+            "FrameForge",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Warning,
+            MessageBoxResult.Yes);
+
+        if (result == MessageBoxResult.Cancel)
+        {
+            return false;
+        }
+
+        if (result == MessageBoxResult.Yes)
+        {
+            return TrySaveProject(forceSaveAs: false);
         }
 
         return true;
@@ -670,6 +961,17 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         ThumbnailHeight = Math.Max(48, e.NewSize.Height - 36);
     }
 
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        if (!TryConfirmDiscardUnsavedChanges())
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        base.OnClosing(e);
+    }
+
     protected override void OnClosed(EventArgs e)
     {
         StopPlayback();
@@ -685,15 +987,24 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
 public sealed class AnimationFrame
 {
-    public AnimationFrame(string name, BitmapSource image, string? sourcePath = null)
+    public AnimationFrame(
+        string name,
+        BitmapSource image,
+        string? sourcePath = null,
+        string? assetId = null,
+        string? assetPath = null)
     {
         Name = name;
         SourcePath = sourcePath;
+        AssetId = assetId;
+        AssetPath = assetPath;
         Image = image;
     }
 
     public string Name { get; }
     public string? SourcePath { get; }
+    public string? AssetId { get; }
+    public string? AssetPath { get; }
     public BitmapSource Image { get; }
 }
 
