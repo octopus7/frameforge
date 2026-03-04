@@ -416,7 +416,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         if (Keyboard.Modifiers == ModifierKeys.Control
             && key == Key.V
-            && ThumbnailList.IsKeyboardFocusWithin
+            && (ThumbnailList.IsKeyboardFocusWithin || ThumbnailList.IsMouseOver)
             && PasteClipboardImagesAfterSelection())
         {
             e.Handled = true;
@@ -626,6 +626,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void ThumbnailList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (!ThumbnailList.IsKeyboardFocusWithin)
+        {
+            Keyboard.Focus(ThumbnailList);
+        }
+
         _thumbnailDragStartPoint = e.GetPosition(ThumbnailList);
 
         var clickedItem = FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject);
