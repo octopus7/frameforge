@@ -124,6 +124,8 @@
                 <MenuItem Header="단일 이미지에서 시트 가져오기"
                           Click="ImportSingleImageSheetMenuItem_Click" />
                 <Separator />
+                <MenuItem Header="옵션..."
+                          Click="OptionsMenuItem_Click" />
                 <MenuItem Header="종료"
                           InputGestureText="Alt+F4"
                           Click="ExitMenuItem_Click" />

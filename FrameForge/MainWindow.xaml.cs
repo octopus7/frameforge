@@ -631,6 +631,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         TrySaveProject(forceSaveAs: true);
     }
 
+    private void OptionsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var optionsWindow = new OptionsWindow
+        {
+            Owner = this
+        };
+        optionsWindow.ShowDialog();
+    }
+
     private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
     {
         Close();
@@ -679,8 +688,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         if (dialog.ShowDialog(this) == true)
         {
-            TryLoadProject(dialog.FileName);
+            OpenProjectFromPath(dialog.FileName, confirmUnsavedChanges: false);
         }
+    }
+
+    public bool OpenProjectFromPath(string projectPath, bool confirmUnsavedChanges = true)
+    {
+        if (confirmUnsavedChanges && !TryConfirmDiscardUnsavedChanges())
+        {
+            return false;
+        }
+
+        return TryLoadProject(projectPath);
     }
 
     private bool TryLoadProject(string projectPath)
