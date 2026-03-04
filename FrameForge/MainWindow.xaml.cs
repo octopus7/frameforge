@@ -151,19 +151,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     public void AddFrame(BitmapSource image, string? name = null, string? sourcePath = null, bool focusAddedFrame = true)
     {
-        var frameName = string.IsNullOrWhiteSpace(name) ? $"Frame_{Frames.Count + 1:000}" : name;
-
-        if (image is Freezable freezable && freezable.CanFreeze && !freezable.IsFrozen)
-        {
-            freezable.Freeze();
-        }
-
-        Frames.Add(new AnimationFrame(frameName, image, sourcePath));
-        OnPropertyChanged(nameof(HasFrames));
+        var insertedIndex = InsertFrameAtIndex(Frames.Count, image, name, sourcePath);
 
         if (focusAddedFrame)
         {
-            SelectedFrameIndex = Frames.Count - 1;
+            SelectedFrameIndex = insertedIndex;
             return;
         }
 
@@ -207,6 +199,21 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         var extension = Path.GetExtension(path);
         return !string.IsNullOrWhiteSpace(extension) && SupportedImageExtensions.Contains(extension);
+    }
+
+    private int InsertFrameAtIndex(int insertionIndex, BitmapSource image, string? name = null, string? sourcePath = null)
+    {
+        var frameName = string.IsNullOrWhiteSpace(name) ? $"Frame_{Frames.Count + 1:000}" : name;
+
+        if (image is Freezable freezable && freezable.CanFreeze && !freezable.IsFrozen)
+        {
+            freezable.Freeze();
+        }
+
+        var normalizedInsertionIndex = Math.Clamp(insertionIndex, 0, Frames.Count);
+        Frames.Insert(normalizedInsertionIndex, new AnimationFrame(frameName, image, sourcePath));
+        OnPropertyChanged(nameof(HasFrames));
+        return normalizedInsertionIndex;
     }
 
     private void AddFramesFromPaths(IEnumerable<string> paths)
@@ -405,6 +412,17 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+
+        if (Keyboard.Modifiers == ModifierKeys.Control
+            && key == Key.V
+            && ThumbnailList.IsKeyboardFocusWithin
+            && PasteClipboardImagesAfterSelection())
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Key.Left)
         {
             MoveSelection(-1, wrap: IsLoopEnabled);
@@ -431,6 +449,73 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             RemoveSelectedFrame();
             e.Handled = true;
         }
+    }
+
+    private bool PasteClipboardImagesAfterSelection()
+    {
+        var imagesToInsert = new List<(BitmapSource Image, string? Name, string? SourcePath)>();
+
+        try
+        {
+            if (Clipboard.ContainsImage())
+            {
+                var clipboardImage = Clipboard.GetImage();
+                if (clipboardImage is not null)
+                {
+                    imagesToInsert.Add((clipboardImage, null, null));
+                }
+            }
+            else if (Clipboard.ContainsFileDropList())
+            {
+                var droppedFiles = Clipboard.GetFileDropList();
+                foreach (var path in droppedFiles)
+                {
+                    if (path is null)
+                    {
+                        continue;
+                    }
+
+                    if (!IsSupportedImagePath(path))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        imagesToInsert.Add((LoadBitmap(path), Path.GetFileName(path), path));
+                    }
+                    catch
+                    {
+                        // Continue importing valid files if one file fails.
+                    }
+                }
+            }
+        }
+        catch
+        {
+            return false;
+        }
+
+        if (imagesToInsert.Count == 0)
+        {
+            return false;
+        }
+
+        var insertionIndex = SelectedFrameIndex >= 0 ? SelectedFrameIndex + 1 : Frames.Count;
+        var lastInsertedIndex = -1;
+
+        foreach (var (image, name, sourcePath) in imagesToInsert)
+        {
+            lastInsertedIndex = InsertFrameAtIndex(insertionIndex, image, name, sourcePath);
+            insertionIndex = lastInsertedIndex + 1;
+        }
+
+        if (lastInsertedIndex >= 0)
+        {
+            SelectedFrameIndex = lastInsertedIndex;
+        }
+
+        return true;
     }
 
     private void PreviousFrameButton_Click(object sender, RoutedEventArgs e)
