@@ -1,4 +1,4 @@
-<Window x:Class="FrameForge.SpriteSheetImportWindow"
+﻿<Window x:Class="FrameForge.SpriteSheetImportWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -9,13 +9,13 @@
         Height="720"
         MinWidth="680"
         MinHeight="460"
-        Background="#1B1B1B"
+        Background="{StaticResource Brush.WindowBackground}"
         WindowStartupLocation="CenterOwner"
         PreviewKeyDown="Window_PreviewKeyDown">
     <Grid>
         <Border Margin="10"
-                Background="#101010"
-                BorderBrush="#2E2E2E"
+                Background="{StaticResource Brush.ViewportBackground}"
+                BorderBrush="{StaticResource Brush.BorderDefault}"
                 BorderThickness="1"
                 CornerRadius="6">
             <Grid>
@@ -24,7 +24,7 @@
                               HorizontalScrollBarVisibility="Auto"
                               VerticalScrollBarVisibility="Auto"
                               Padding="16"
-                              Background="#111111">
+                              Background="{StaticResource Brush.ViewportBackground}">
                     <Grid HorizontalAlignment="Left" VerticalAlignment="Top">
                         <Image x:Name="SourceImageView"
                                Stretch="None"
@@ -40,21 +40,21 @@
                                 MouseLeftButtonUp="OverlayCanvas_MouseLeftButtonUp">
                             <Rectangle x:Name="SelectionRectangle"
                                        Visibility="Collapsed"
-                                       Stroke="#FFE36A"
+                                       Stroke="{StaticResource Brush.Warning}"
                                        StrokeThickness="2"
-                                       Fill="#33FFE36A" />
+                                       Fill="{StaticResource Brush.WarningOverlay}" />
 
                             <Border x:Name="SelectionHint"
                                     Visibility="Collapsed"
                                     Padding="6,3"
                                     CornerRadius="4"
-                                    BorderBrush="#CC7F6A00"
+                                    BorderBrush="{StaticResource Brush.HintBorder}"
                                     BorderThickness="1"
-                                    Background="#F2FFF2C2">
+                                    Background="{StaticResource Brush.HintBackground}">
                                 <TextBlock Text="스페이스 키를 누르면 프레임으로 추가"
                                            FontSize="12"
                                            FontWeight="SemiBold"
-                                           Foreground="#2A2200" />
+                                           Foreground="{StaticResource Brush.HintText}" />
                             </Border>
                         </Canvas>
                     </Grid>
@@ -66,15 +66,12 @@
                                 Height="56"
                                 Margin="0,0,0,10"
                                 Click="LoadImageButton_Click"
-                                Cursor="Hand"
-                                Background="#2C2C2C"
-                                Foreground="#F3F3F3"
-                                BorderBrush="#4A4A4A">
+                                Cursor="Hand">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <Path Width="16"
                                       Height="16"
                                       Margin="0,0,8,0"
-                                      Stroke="#F3F3F3"
+                                      Stroke="{StaticResource Brush.Icon}"
                                       StrokeThickness="2"
                                       StrokeStartLineCap="Round"
                                       StrokeEndLineCap="Round"
@@ -89,15 +86,12 @@
                         <Button Width="230"
                                 Height="56"
                                 Click="LoadFromClipboardButton_Click"
-                                Cursor="Hand"
-                                Background="#2C2C2C"
-                                Foreground="#F3F3F3"
-                                BorderBrush="#4A4A4A">
+                                Cursor="Hand">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <Path Width="16"
                                       Height="16"
                                       Margin="0,0,8,0"
-                                      Stroke="#F3F3F3"
+                                      Stroke="{StaticResource Brush.Icon}"
                                       StrokeThickness="1.8"
                                       StrokeStartLineCap="Round"
                                       StrokeEndLineCap="Round"
