@@ -29,6 +29,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly DispatcherTimer _playbackTimer;
     private SpriteSheetImportWindow? _sheetImportWindow;
     private int _selectedFrameIndex = -1;
+    private int _canvasWidth;
+    private int _canvasHeight;
     private bool _isPlaying;
     private bool _isLoopEnabled;
     private bool _isPreviewDragging;
@@ -36,6 +38,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private double _thumbnailHeight = 120;
     private Point _previewDragStartPoint;
     private Rect _previewSelectionDip = Rect.Empty;
+    private CanvasViewportLayout _previewLayout = CanvasViewportLayout.Empty;
     private Point _thumbnailDragStartPoint;
     private AnimationFrame? _thumbnailDragSourceFrame;
     private string? _currentProjectPath;
@@ -54,12 +57,20 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _playbackTimer.Tick += PlaybackTimer_Tick;
 
         UpdateWindowTitle();
-        Loaded += (_, _) => Keyboard.Focus(this);
+        Loaded += (_, _) =>
+        {
+            Keyboard.Focus(this);
+            UpdatePreviewWorkspaceLayout();
+        };
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ObservableCollection<AnimationFrame> Frames { get; } = [];
+
+    public int CanvasWidth => _canvasWidth;
+
+    public int CanvasHeight => _canvasHeight;
 
     public int SelectedFrameIndex
     {
@@ -77,15 +88,19 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             OnPropertyChanged();
             OnPropertyChanged(nameof(CurrentFrameImage));
             OnPropertyChanged(nameof(CurrentFrameSummary));
+            UpdatePreviewWorkspaceLayout();
             EnsureCurrentFrameVisibleAndFocused();
         }
     }
 
-    public BitmapSource? CurrentFrameImage =>
-        SelectedFrameIndex >= 0 && SelectedFrameIndex < Frames.Count ? Frames[SelectedFrameIndex].Image : null;
+    public BitmapSource? CurrentFrameImage => CurrentFrame?.Image;
 
     public string CurrentFrameSummary =>
-        HasFrames ? $"Frame {SelectedFrameIndex + 1}/{Frames.Count} - {Frames[SelectedFrameIndex].Name}" : "Frame 0/0";
+        HasFrames
+            ? $"Frame {SelectedFrameIndex + 1}/{Frames.Count} - {CurrentFrame!.Name} | Canvas {CanvasWidth}x{CanvasHeight}"
+            : HasCanvas
+                ? $"Frame 0/0 | Canvas {CanvasWidth}x{CanvasHeight}"
+                : "Frame 0/0";
 
     public string EmptyFrameMessage => IsKoreanUiCulture
         ? "하단 영역에 프레임 이미지를 추가하면 현재 프레임이 여기에 표시됩니다."
@@ -93,9 +108,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     public bool HasFrames => Frames.Count > 0;
 
+    public bool HasCanvas => CanvasWidth > 0 && CanvasHeight > 0;
+
     public bool HasPreviewSelection => HasValidPreviewSelection(_previewSelectionDip);
 
-    public bool CanCropCurrentFrame => HasFrames && HasPreviewSelection && CurrentFrameImage is not null;
+    public bool CanCropCanvas => HasCanvas && HasPreviewSelection;
 
     public bool IsLoopEnabled
     {
@@ -184,10 +201,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
         else
         {
-            OnPropertyChanged(nameof(CurrentFrameSummary));
+            RefreshCurrentFrameState(includeImageProperty: false);
             EnsureCurrentFrameVisibleAndFocused();
         }
     }
+
+    private AnimationFrame? CurrentFrame =>
+        SelectedFrameIndex >= 0 && SelectedFrameIndex < Frames.Count ? Frames[SelectedFrameIndex] : null;
 
     private static bool IsKoreanUiCulture =>
         string.Equals(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName, "ko", StringComparison.OrdinalIgnoreCase);
@@ -257,6 +277,83 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         return !string.IsNullOrWhiteSpace(extension) && SupportedImageExtensions.Contains(extension);
     }
 
+    private void SetCanvasSize(int width, int height)
+    {
+        width = Math.Max(0, width);
+        height = Math.Max(0, height);
+
+        if (_canvasWidth == width && _canvasHeight == height)
+        {
+            return;
+        }
+
+        _canvasWidth = width;
+        _canvasHeight = height;
+        OnPropertyChanged(nameof(CanvasWidth));
+        OnPropertyChanged(nameof(CanvasHeight));
+        OnPropertyChanged(nameof(HasCanvas));
+        OnPropertyChanged(nameof(CurrentFrameSummary));
+        UpdatePreviewWorkspaceLayout();
+
+        if (!_suppressDirtyTracking)
+        {
+            MarkDirty();
+        }
+    }
+
+    private void ResetCanvas()
+    {
+        SetCanvasSize(0, 0);
+    }
+
+    private void RefreshCurrentFrameState(bool includeImageProperty)
+    {
+        if (includeImageProperty)
+        {
+            OnPropertyChanged(nameof(CurrentFrameImage));
+        }
+
+        OnPropertyChanged(nameof(CurrentFrameSummary));
+        UpdatePreviewWorkspaceLayout();
+    }
+
+    private void UpdatePreviewWorkspaceLayout()
+    {
+        _previewLayout = CanvasLayoutHelper.CalculateViewport(CanvasWidth, CanvasHeight, CurrentFrame);
+        PreviewOverlayCanvas.Width = _previewLayout.WorkspaceWidth;
+        PreviewOverlayCanvas.Height = _previewLayout.WorkspaceHeight;
+
+        if (!HasCanvas || _previewLayout.CanvasRect.IsEmpty)
+        {
+            PreviewCanvasBounds.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            PreviewCanvasBounds.Visibility = Visibility.Visible;
+            PreviewCanvasBounds.Width = _previewLayout.CanvasRect.Width;
+            PreviewCanvasBounds.Height = _previewLayout.CanvasRect.Height;
+            Canvas.SetLeft(PreviewCanvasBounds, _previewLayout.CanvasRect.X);
+            Canvas.SetTop(PreviewCanvasBounds, _previewLayout.CanvasRect.Y);
+        }
+
+        var currentFrameImage = CurrentFrameImage;
+        PreviewFrameImage.Source = currentFrameImage;
+
+        if (currentFrameImage is null || _previewLayout.FrameRect.IsEmpty)
+        {
+            PreviewFrameImage.Visibility = Visibility.Collapsed;
+            PreviewFrameImage.Width = 0;
+            PreviewFrameImage.Height = 0;
+            return;
+        }
+
+        PreviewFrameImage.Visibility = Visibility.Visible;
+        PreviewFrameImage.Width = currentFrameImage.PixelWidth;
+        PreviewFrameImage.Height = currentFrameImage.PixelHeight;
+        Canvas.SetLeft(PreviewFrameImage, _previewLayout.FrameRect.X);
+        Canvas.SetTop(PreviewFrameImage, _previewLayout.FrameRect.Y);
+    }
+
     private int InsertFrameAtIndex(int insertionIndex, BitmapSource image, string? name = null, string? sourcePath = null)
     {
         var frameName = string.IsNullOrWhiteSpace(name) ? $"Frame_{Frames.Count + 1:000}" : name;
@@ -266,9 +363,20 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             freezable.Freeze();
         }
 
+        if (!HasCanvas)
+        {
+            SetCanvasSize(image.PixelWidth, image.PixelHeight);
+        }
+
+        var position = Frames.Count == 0
+            ? new Point(0, 0)
+            : CanvasLayoutHelper.CenterFrame(CanvasWidth, CanvasHeight, image.PixelWidth, image.PixelHeight);
         var normalizedInsertionIndex = Math.Clamp(insertionIndex, 0, Frames.Count);
-        Frames.Insert(normalizedInsertionIndex, new AnimationFrame(frameName, image, sourcePath));
+        Frames.Insert(
+            normalizedInsertionIndex,
+            new AnimationFrame(frameName, image, (int)position.X, (int)position.Y, sourcePath));
         OnPropertyChanged(nameof(HasFrames));
+        RefreshCurrentFrameState(includeImageProperty: false);
 
         if (!_suppressDirtyTracking)
         {
@@ -280,13 +388,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private static bool HasValidPreviewSelection(Rect selectionRect)
     {
-        return selectionRect.Width >= 2 && selectionRect.Height >= 2;
+        return selectionRect.Width > 0 && selectionRect.Height > 0;
     }
 
     private void NotifyPreviewSelectionStateChanged()
     {
         OnPropertyChanged(nameof(HasPreviewSelection));
-        OnPropertyChanged(nameof(CanCropCurrentFrame));
+        OnPropertyChanged(nameof(CanCropCanvas));
     }
 
     private void ClearPreviewSelection()
@@ -320,39 +428,52 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         NotifyPreviewSelectionStateChanged();
     }
 
-    private bool CropCurrentFrame()
+    private static Point ClampPointToRect(Point point, Rect rect)
     {
-        if (!CanCropCurrentFrame
-            || CurrentFrameImage is null
-            || SelectedFrameIndex < 0
-            || SelectedFrameIndex >= Frames.Count)
+        return new Point(
+            Math.Clamp(point.X, rect.Left, rect.Right),
+            Math.Clamp(point.Y, rect.Top, rect.Bottom));
+    }
+
+    private bool CropCurrentCanvas()
+    {
+        if (!CanCropCanvas || !HasCanvas || _previewLayout.CanvasRect.IsEmpty)
         {
             return false;
         }
 
         StopPlayback();
 
-        var pixelRect = ImageSelectionHelper.ToPixelRect(_previewSelectionDip, CurrentFrameImage);
+        var pixelRect = CanvasLayoutHelper.ClampSelectionToCanvas(
+            _previewSelectionDip,
+            _previewLayout.CanvasRect,
+            CanvasWidth,
+            CanvasHeight);
         if (pixelRect.IsEmpty || pixelRect.Width <= 0 || pixelRect.Height <= 0)
         {
             return false;
         }
 
-        var cropped = new CroppedBitmap(CurrentFrameImage, pixelRect);
-        cropped.Freeze();
+        if (pixelRect.X == 0
+            && pixelRect.Y == 0
+            && pixelRect.Width == CanvasWidth
+            && pixelRect.Height == CanvasHeight)
+        {
+            ClearPreviewSelection();
+            return false;
+        }
 
-        var currentFrame = Frames[SelectedFrameIndex];
-        Frames[SelectedFrameIndex] = new AnimationFrame(currentFrame.Name, cropped);
+        var shiftedFrames = CanvasLayoutHelper.OffsetFrames(Frames, -pixelRect.X, -pixelRect.Y);
+        for (var i = 0; i < shiftedFrames.Count; i++)
+        {
+            Frames[i] = shiftedFrames[i];
+        }
+
+        SetCanvasSize(pixelRect.Width, pixelRect.Height);
         ThumbnailList.SelectedIndex = SelectedFrameIndex;
 
         ClearPreviewSelection();
-        OnPropertyChanged(nameof(CurrentFrameImage));
-        OnPropertyChanged(nameof(CurrentFrameSummary));
-
-        if (!_suppressDirtyTracking)
-        {
-            MarkDirty();
-        }
+        RefreshCurrentFrameState(includeImageProperty: false);
 
         return true;
     }
@@ -412,19 +533,32 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Frames.RemoveAt(removedIndex);
         OnPropertyChanged(nameof(HasFrames));
 
-        if (!_suppressDirtyTracking)
-        {
-            MarkDirty();
-        }
-
         if (Frames.Count == 0)
         {
             StopPlayback();
+            ResetCanvas();
             SelectedFrameIndex = -1;
             return;
         }
 
-        SelectedFrameIndex = Math.Clamp(removedIndex, 0, Frames.Count - 1);
+        var nextIndex = Math.Clamp(removedIndex, 0, Frames.Count - 1);
+        if (_selectedFrameIndex == nextIndex)
+        {
+            ClearPreviewSelection();
+            OnPropertyChanged(nameof(CurrentFrameImage));
+            OnPropertyChanged(nameof(CurrentFrameSummary));
+            UpdatePreviewWorkspaceLayout();
+            EnsureCurrentFrameVisibleAndFocused();
+        }
+        else
+        {
+            SelectedFrameIndex = nextIndex;
+        }
+
+        if (!_suppressDirtyTracking)
+        {
+            MarkDirty();
+        }
     }
 
     private void MoveFrameByInsertionIndex(int sourceIndex, int insertionIndex)
@@ -570,7 +704,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         if (modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && key == Key.X)
         {
-            CropCurrentFrame();
+            CropCurrentCanvas();
             e.Handled = true;
             return;
         }
@@ -729,7 +863,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void CropMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        CropCurrentFrame();
+        CropCurrentCanvas();
     }
 
     private void OptionsMenuItem_Click(object sender, RoutedEventArgs e)
@@ -759,6 +893,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             StopPlayback();
             ClearPreviewSelection();
             Frames.Clear();
+            ResetCanvas();
             IsLoopEnabled = false;
             SelectedFrameIndex = -1;
             OnPropertyChanged(nameof(HasFrames));
@@ -816,6 +951,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 StopPlayback();
                 ClearPreviewSelection();
                 Frames.Clear();
+                SetCanvasSize(loadResult.CanvasWidth, loadResult.CanvasHeight);
                 foreach (var frame in loadResult.Frames)
                 {
                     Frames.Add(frame);
@@ -827,6 +963,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 OnPropertyChanged(nameof(HasFrames));
                 OnPropertyChanged(nameof(CurrentFrameImage));
                 OnPropertyChanged(nameof(CurrentFrameSummary));
+                UpdatePreviewWorkspaceLayout();
             }
             finally
             {
@@ -886,7 +1023,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         try
         {
-            ProjectStorageService.SaveProject(targetProjectPath!, Frames, IsLoopEnabled, SelectedFrameIndex);
+            ProjectStorageService.SaveProject(
+                targetProjectPath!,
+                Frames,
+                CanvasWidth,
+                CanvasHeight,
+                IsLoopEnabled,
+                SelectedFrameIndex);
             SetCurrentProjectPath(targetProjectPath);
             MarkClean();
             return true;
@@ -999,7 +1142,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void PreviewOverlayCanvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (CurrentFrameImage is null
+        if (!HasCanvas
+            || _previewLayout.CanvasRect.IsEmpty
             || PreviewOverlayCanvas.ActualWidth <= 0
             || PreviewOverlayCanvas.ActualHeight <= 0)
         {
@@ -1009,8 +1153,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         StopPlayback();
         Focus();
 
+        var startPoint = e.GetPosition(PreviewOverlayCanvas);
+        if (!_previewLayout.CanvasRect.Contains(startPoint))
+        {
+            return;
+        }
+
         _isPreviewDragging = true;
-        _previewDragStartPoint = e.GetPosition(PreviewOverlayCanvas);
+        _previewDragStartPoint = ClampPointToRect(startPoint, _previewLayout.CanvasRect);
         _previewSelectionDip = new Rect(_previewDragStartPoint, _previewDragStartPoint);
         PreviewOverlayCanvas.CaptureMouse();
         UpdatePreviewSelectionVisual();
@@ -1019,12 +1169,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void PreviewOverlayCanvas_MouseMove(object sender, MouseEventArgs e)
     {
-        if (!_isPreviewDragging || CurrentFrameImage is null)
+        if (!_isPreviewDragging || !HasCanvas || _previewLayout.CanvasRect.IsEmpty)
         {
             return;
         }
 
-        var currentPoint = e.GetPosition(PreviewOverlayCanvas);
+        var currentPoint = ClampPointToRect(e.GetPosition(PreviewOverlayCanvas), _previewLayout.CanvasRect);
         _previewSelectionDip = ImageSelectionHelper.NormalizeRect(_previewDragStartPoint, currentPoint);
         UpdatePreviewSelectionVisual();
         e.Handled = true;
@@ -1040,7 +1190,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _isPreviewDragging = false;
         PreviewOverlayCanvas.ReleaseMouseCapture();
 
-        var currentPoint = e.GetPosition(PreviewOverlayCanvas);
+        var currentPoint = _previewLayout.CanvasRect.IsEmpty
+            ? e.GetPosition(PreviewOverlayCanvas)
+            : ClampPointToRect(e.GetPosition(PreviewOverlayCanvas), _previewLayout.CanvasRect);
         _previewSelectionDip = ImageSelectionHelper.NormalizeRect(_previewDragStartPoint, currentPoint);
 
         if (!HasValidPreviewSelection(_previewSelectionDip))
@@ -1170,11 +1322,15 @@ public sealed class AnimationFrame
     public AnimationFrame(
         string name,
         BitmapSource image,
+        int x,
+        int y,
         string? sourcePath = null,
         string? assetId = null,
         string? assetPath = null)
     {
         Name = name;
+        X = x;
+        Y = y;
         SourcePath = sourcePath;
         AssetId = assetId;
         AssetPath = assetPath;
@@ -1182,9 +1338,16 @@ public sealed class AnimationFrame
     }
 
     public string Name { get; }
+    public int X { get; }
+    public int Y { get; }
     public string? SourcePath { get; }
     public string? AssetId { get; }
     public string? AssetPath { get; }
     public BitmapSource Image { get; }
+
+    public AnimationFrame WithPosition(int x, int y)
+    {
+        return new AnimationFrame(Name, Image, x, y, SourcePath, AssetId, AssetPath);
+    }
 }
 

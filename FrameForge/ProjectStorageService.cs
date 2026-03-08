@@ -10,29 +10,35 @@ namespace FrameForge;
 
 public static class ProjectStorageService
 {
-    private const int CurrentProjectVersion = 1;
+    private const int CurrentProjectVersion = 2;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true
     };
 
-    public static void SaveProject(string projectPath, IReadOnlyList<AnimationFrame> frames, bool isLoopEnabled, int selectedFrameIndex)
+    public static void SaveProject(
+        string projectPath,
+        IReadOnlyList<AnimationFrame> frames,
+        int canvasWidth,
+        int canvasHeight,
+        bool isLoopEnabled,
+        int selectedFrameIndex)
     {
         if (string.IsNullOrWhiteSpace(projectPath))
         {
-            throw new ArgumentException("프로젝트 경로가 비어 있습니다.", nameof(projectPath));
+            throw new ArgumentException("Project path is required.", nameof(projectPath));
         }
 
         ArgumentNullException.ThrowIfNull(frames);
 
         var normalizedProjectPath = Path.GetFullPath(projectPath);
         var projectDirectory = Path.GetDirectoryName(normalizedProjectPath)
-            ?? throw new InvalidOperationException("프로젝트 디렉터리를 확인할 수 없습니다.");
+            ?? throw new InvalidOperationException("Could not determine the project directory.");
         var projectStem = Path.GetFileNameWithoutExtension(normalizedProjectPath);
         if (string.IsNullOrWhiteSpace(projectStem))
         {
-            throw new InvalidOperationException("프로젝트 파일 이름이 올바르지 않습니다.");
+            throw new InvalidOperationException("Could not determine the project file name.");
         }
 
         var assetsRootRelative = $"{projectStem}.assets/frames";
@@ -61,7 +67,9 @@ public static class ProjectStorageService
             {
                 Name = frameName,
                 AssetId = assetId,
-                AssetPath = assetRelativePath
+                AssetPath = assetRelativePath,
+                X = frame.X,
+                Y = frame.Y
             });
         }
 
@@ -78,7 +86,9 @@ public static class ProjectStorageService
             Settings = new FrameProjectSettings
             {
                 IsLoopEnabled = isLoopEnabled,
-                SelectedFrameIndex = normalizedSelectedIndex
+                SelectedFrameIndex = normalizedSelectedIndex,
+                CanvasWidth = Math.Max(0, canvasWidth),
+                CanvasHeight = Math.Max(0, canvasHeight)
             },
             Frames = frameEntries
         };
@@ -91,26 +101,26 @@ public static class ProjectStorageService
     {
         if (string.IsNullOrWhiteSpace(projectPath))
         {
-            throw new ArgumentException("프로젝트 경로가 비어 있습니다.", nameof(projectPath));
+            throw new ArgumentException("Project path is required.", nameof(projectPath));
         }
 
         var normalizedProjectPath = Path.GetFullPath(projectPath);
         if (!File.Exists(normalizedProjectPath))
         {
-            throw new FileNotFoundException("프로젝트 파일을 찾을 수 없습니다.", normalizedProjectPath);
+            throw new FileNotFoundException("Project file was not found.", normalizedProjectPath);
         }
 
         var json = File.ReadAllText(normalizedProjectPath, Encoding.UTF8);
         var document = JsonSerializer.Deserialize<FrameProjectDocument>(json, JsonOptions)
-            ?? throw new InvalidDataException("프로젝트 파일을 읽을 수 없습니다.");
+            ?? throw new InvalidDataException("Project file could not be read.");
 
-        if (document.Version != CurrentProjectVersion)
+        if (document.Version is not 1 and not CurrentProjectVersion)
         {
-            throw new NotSupportedException($"지원하지 않는 프로젝트 버전입니다. (version={document.Version})");
+            throw new NotSupportedException($"Unsupported project version: {document.Version}");
         }
 
         var projectDirectory = Path.GetDirectoryName(normalizedProjectPath)
-            ?? throw new InvalidOperationException("프로젝트 디렉터리를 확인할 수 없습니다.");
+            ?? throw new InvalidOperationException("Could not determine the project directory.");
         var projectDirectoryFullPath = Path.GetFullPath(projectDirectory);
         var projectDirectoryWithSeparator = Path.EndsInDirectorySeparator(projectDirectoryFullPath)
             ? projectDirectoryFullPath
@@ -141,12 +151,25 @@ public static class ProjectStorageService
                 var frameName = string.IsNullOrWhiteSpace(entry.Name)
                     ? $"Frame_{loadedFrames.Count + 1:000}"
                     : entry.Name;
-                loadedFrames.Add(new AnimationFrame(frameName, image, assetFullPath, entry.AssetId, entry.AssetPath));
+                loadedFrames.Add(new AnimationFrame(frameName, image, entry.X, entry.Y, assetFullPath, entry.AssetId, entry.AssetPath));
             }
             catch
             {
                 missingFrameCount++;
             }
+        }
+
+        var canvasWidth = Math.Max(0, document.Settings?.CanvasWidth ?? 0);
+        var canvasHeight = Math.Max(0, document.Settings?.CanvasHeight ?? 0);
+
+        if (document.Version == 1)
+        {
+            (loadedFrames, canvasWidth, canvasHeight) = UpgradeVersion1Frames(loadedFrames);
+        }
+        else if ((canvasWidth <= 0 || canvasHeight <= 0) && loadedFrames.Count > 0)
+        {
+            canvasWidth = loadedFrames[0].Image.PixelWidth;
+            canvasHeight = loadedFrames[0].Image.PixelHeight;
         }
 
         var loadedSelectedIndex = loadedFrames.Count == 0
@@ -155,6 +178,8 @@ public static class ProjectStorageService
 
         return new FrameProjectLoadResult(
             loadedFrames,
+            canvasWidth,
+            canvasHeight,
             document.Settings?.IsLoopEnabled ?? false,
             loadedSelectedIndex,
             missingFrameCount);
@@ -200,6 +225,37 @@ public static class ProjectStorageService
         return Path.GetFullPath(Path.Combine(projectDirectory, normalized));
     }
 
+    private static (List<AnimationFrame> Frames, int CanvasWidth, int CanvasHeight) UpgradeVersion1Frames(List<AnimationFrame> loadedFrames)
+    {
+        if (loadedFrames.Count == 0)
+        {
+            return (loadedFrames, 0, 0);
+        }
+
+        var canvasWidth = loadedFrames[0].Image.PixelWidth;
+        var canvasHeight = loadedFrames[0].Image.PixelHeight;
+        var upgradedFrames = new List<AnimationFrame>(loadedFrames.Count);
+
+        for (var i = 0; i < loadedFrames.Count; i++)
+        {
+            var frame = loadedFrames[i];
+            if (i == 0)
+            {
+                upgradedFrames.Add(frame.WithPosition(0, 0));
+                continue;
+            }
+
+            var position = CanvasLayoutHelper.CenterFrame(
+                canvasWidth,
+                canvasHeight,
+                frame.Image.PixelWidth,
+                frame.Image.PixelHeight);
+            upgradedFrames.Add(frame.WithPosition((int)position.X, (int)position.Y));
+        }
+
+        return (upgradedFrames, canvasWidth, canvasHeight);
+    }
+
     private static void WriteTextAtomic(string targetPath, string content)
     {
         var bytes = Encoding.UTF8.GetBytes(content);
@@ -211,7 +267,7 @@ public static class ProjectStorageService
         var directory = Path.GetDirectoryName(targetPath);
         if (string.IsNullOrWhiteSpace(directory))
         {
-            throw new InvalidOperationException("저장 디렉터리를 확인할 수 없습니다.");
+            throw new InvalidOperationException("Could not determine the target directory.");
         }
 
         Directory.CreateDirectory(directory);

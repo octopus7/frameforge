@@ -340,9 +340,9 @@
             </MenuItem>
 
             <MenuItem Header="편집">
-                <MenuItem Header="크롭"
+                <MenuItem Header="캔버스 크롭"
                           InputGestureText="Ctrl+Shift+X"
-                          IsEnabled="{Binding CanCropCurrentFrame}"
+                          IsEnabled="{Binding CanCropCanvas}"
                           Click="CropMenuItem_Click" />
             </MenuItem>
         </Menu>
@@ -363,33 +363,39 @@
                             Padding="20"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Top">
-                        <Grid HorizontalAlignment="Left"
-                              VerticalAlignment="Top">
-                            <Grid.LayoutTransform>
+                        <Canvas x:Name="PreviewOverlayCanvas"
+                                Width="1"
+                                Height="1"
+                                Background="Transparent"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Top"
+                                MouseLeftButtonDown="PreviewOverlayCanvas_MouseLeftButtonDown"
+                                MouseMove="PreviewOverlayCanvas_MouseMove"
+                                MouseLeftButtonUp="PreviewOverlayCanvas_MouseLeftButtonUp">
+                            <Canvas.LayoutTransform>
                                 <ScaleTransform ScaleX="{Binding ZoomFactor}"
                                                 ScaleY="{Binding ZoomFactor}" />
-                            </Grid.LayoutTransform>
+                            </Canvas.LayoutTransform>
 
-                            <Image x:Name="PreviewImage"
-                                   Source="{Binding CurrentFrameImage}"
+                            <Rectangle x:Name="PreviewCanvasBounds"
+                                       Visibility="Collapsed"
+                                       Fill="{StaticResource Brush.SurfaceBackground}"
+                                       Stroke="{StaticResource Brush.BorderStrong}"
+                                       StrokeThickness="1"
+                                       SnapsToDevicePixels="True" />
+
+                            <Image x:Name="PreviewFrameImage"
+                                   Visibility="Collapsed"
                                    Stretch="None"
                                    SnapsToDevicePixels="True"
                                    UseLayoutRounding="True" />
 
-                            <Canvas x:Name="PreviewOverlayCanvas"
-                                    Width="{Binding ElementName=PreviewImage, Path=ActualWidth}"
-                                    Height="{Binding ElementName=PreviewImage, Path=ActualHeight}"
-                                    Background="Transparent"
-                                    MouseLeftButtonDown="PreviewOverlayCanvas_MouseLeftButtonDown"
-                                    MouseMove="PreviewOverlayCanvas_MouseMove"
-                                    MouseLeftButtonUp="PreviewOverlayCanvas_MouseLeftButtonUp">
-                                <Rectangle x:Name="PreviewSelectionRectangle"
-                                           Visibility="Collapsed"
-                                           Stroke="{StaticResource Brush.Warning}"
-                                           StrokeThickness="2"
-                                           Fill="{StaticResource Brush.WarningOverlay}" />
-                            </Canvas>
-                        </Grid>
+                            <Rectangle x:Name="PreviewSelectionRectangle"
+                                       Visibility="Collapsed"
+                                       Stroke="{StaticResource Brush.Warning}"
+                                       StrokeThickness="2"
+                                       Fill="{StaticResource Brush.WarningOverlay}" />
+                        </Canvas>
                     </Border>
                 </ScrollViewer>
 

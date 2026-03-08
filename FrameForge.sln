@@ -5,6 +5,8 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FrameForge", "FrameForge\FrameForge.csproj", "{99EEB61C-6C6D-4315-B411-26C460EF52E5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FrameForge.Tests", "FrameForge.Tests\FrameForge.Tests.csproj", "{D3D68D2D-3F0E-4F8D-9F64-3A58B7D6A0D8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,12 +23,24 @@ Global
 		{99EEB61C-6C6D-4315-B411-26C460EF52E5}.Debug|x64.Build.0 = Debug|Any CPU
 		{99EEB61C-6C6D-4315-B411-26C460EF52E5}.Debug|x86.ActiveCfg = Debug|Any CPU
 		{99EEB61C-6C6D-4315-B411-26C460EF52E5}.Debug|x86.Build.0 = Debug|Any CPU
+		{D3D68D2D-3F0E-4F8D-9F64-3A58B7D6A0D8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D3D68D2D-3F0E-4F8D-9F64-3A58B7D6A0D8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D3D68D2D-3F0E-4F8D-9F64-3A58B7D6A0D8}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D3D68D2D-3F0E-4F8D-9F64-3A58B7D6A0D8}.Debug|x64.Build.0 = Debug|Any CPU
+		{D3D68D2D-3F0E-4F8D-9F64-3A58B7D6A0D8}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D3D68D2D-3F0E-4F8D-9F64-3A58B7D6A0D8}.Debug|x86.Build.0 = Debug|Any CPU
 		{99EEB61C-6C6D-4315-B411-26C460EF52E5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{99EEB61C-6C6D-4315-B411-26C460EF52E5}.Release|Any CPU.Build.0 = Release|Any CPU
 		{99EEB61C-6C6D-4315-B411-26C460EF52E5}.Release|x64.ActiveCfg = Release|Any CPU
 		{99EEB61C-6C6D-4315-B411-26C460EF52E5}.Release|x64.Build.0 = Release|Any CPU
 		{99EEB61C-6C6D-4315-B411-26C460EF52E5}.Release|x86.ActiveCfg = Release|Any CPU
 		{99EEB61C-6C6D-4315-B411-26C460EF52E5}.Release|x86.Build.0 = Release|Any CPU
+		{D3D68D2D-3F0E-4F8D-9F64-3A58B7D6A0D8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D3D68D2D-3F0E-4F8D-9F64-3A58B7D6A0D8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D3D68D2D-3F0E-4F8D-9F64-3A58B7D6A0D8}.Release|x64.ActiveCfg = Release|Any CPU
+		{D3D68D2D-3F0E-4F8D-9F64-3A58B7D6A0D8}.Release|x64.Build.0 = Release|Any CPU
+		{D3D68D2D-3F0E-4F8D-9F64-3A58B7D6A0D8}.Release|x86.ActiveCfg = Release|Any CPU
+		{D3D68D2D-3F0E-4F8D-9F64-3A58B7D6A0D8}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
