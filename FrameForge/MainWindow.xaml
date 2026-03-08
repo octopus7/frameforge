@@ -338,6 +338,13 @@
                           InputGestureText="Alt+F4"
                           Click="ExitMenuItem_Click" />
             </MenuItem>
+
+            <MenuItem Header="편집">
+                <MenuItem Header="크롭"
+                          InputGestureText="Ctrl+Shift+X"
+                          IsEnabled="{Binding CanCropCurrentFrame}"
+                          Click="CropMenuItem_Click" />
+            </MenuItem>
         </Menu>
 
         <Border Grid.Row="1"
@@ -356,15 +363,33 @@
                             Padding="20"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Top">
-                        <Image Source="{Binding CurrentFrameImage}"
-                               Stretch="None"
-                               SnapsToDevicePixels="True"
-                               UseLayoutRounding="True">
-                            <Image.LayoutTransform>
+                        <Grid HorizontalAlignment="Left"
+                              VerticalAlignment="Top">
+                            <Grid.LayoutTransform>
                                 <ScaleTransform ScaleX="{Binding ZoomFactor}"
                                                 ScaleY="{Binding ZoomFactor}" />
-                            </Image.LayoutTransform>
-                        </Image>
+                            </Grid.LayoutTransform>
+
+                            <Image x:Name="PreviewImage"
+                                   Source="{Binding CurrentFrameImage}"
+                                   Stretch="None"
+                                   SnapsToDevicePixels="True"
+                                   UseLayoutRounding="True" />
+
+                            <Canvas x:Name="PreviewOverlayCanvas"
+                                    Width="{Binding ElementName=PreviewImage, Path=ActualWidth}"
+                                    Height="{Binding ElementName=PreviewImage, Path=ActualHeight}"
+                                    Background="Transparent"
+                                    MouseLeftButtonDown="PreviewOverlayCanvas_MouseLeftButtonDown"
+                                    MouseMove="PreviewOverlayCanvas_MouseMove"
+                                    MouseLeftButtonUp="PreviewOverlayCanvas_MouseLeftButtonUp">
+                                <Rectangle x:Name="PreviewSelectionRectangle"
+                                           Visibility="Collapsed"
+                                           Stroke="{StaticResource Brush.Warning}"
+                                           StrokeThickness="2"
+                                           Fill="{StaticResource Brush.WarningOverlay}" />
+                            </Canvas>
+                        </Grid>
                     </Border>
                 </ScrollViewer>
 

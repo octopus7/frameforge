@@ -31,8 +31,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private int _selectedFrameIndex = -1;
     private bool _isPlaying;
     private bool _isLoopEnabled;
+    private bool _isPreviewDragging;
     private double _zoomFactor = 1.0;
     private double _thumbnailHeight = 120;
+    private Point _previewDragStartPoint;
+    private Rect _previewSelectionDip = Rect.Empty;
     private Point _thumbnailDragStartPoint;
     private AnimationFrame? _thumbnailDragSourceFrame;
     private string? _currentProjectPath;
@@ -70,6 +73,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             }
 
             _selectedFrameIndex = normalized;
+            ClearPreviewSelection();
             OnPropertyChanged();
             OnPropertyChanged(nameof(CurrentFrameImage));
             OnPropertyChanged(nameof(CurrentFrameSummary));
@@ -88,6 +92,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         : "Add frame images in the bottom area to show the current frame here.";
 
     public bool HasFrames => Frames.Count > 0;
+
+    public bool HasPreviewSelection => HasValidPreviewSelection(_previewSelectionDip);
+
+    public bool CanCropCurrentFrame => HasFrames && HasPreviewSelection && CurrentFrameImage is not null;
 
     public bool IsLoopEnabled
     {
@@ -270,6 +278,85 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         return normalizedInsertionIndex;
     }
 
+    private static bool HasValidPreviewSelection(Rect selectionRect)
+    {
+        return selectionRect.Width >= 2 && selectionRect.Height >= 2;
+    }
+
+    private void NotifyPreviewSelectionStateChanged()
+    {
+        OnPropertyChanged(nameof(HasPreviewSelection));
+        OnPropertyChanged(nameof(CanCropCurrentFrame));
+    }
+
+    private void ClearPreviewSelection()
+    {
+        _isPreviewDragging = false;
+        _previewSelectionDip = Rect.Empty;
+
+        if (PreviewOverlayCanvas.IsMouseCaptured)
+        {
+            PreviewOverlayCanvas.ReleaseMouseCapture();
+        }
+
+        PreviewSelectionRectangle.Visibility = Visibility.Collapsed;
+        NotifyPreviewSelectionStateChanged();
+    }
+
+    private void UpdatePreviewSelectionVisual()
+    {
+        if (!HasValidPreviewSelection(_previewSelectionDip))
+        {
+            PreviewSelectionRectangle.Visibility = Visibility.Collapsed;
+            NotifyPreviewSelectionStateChanged();
+            return;
+        }
+
+        PreviewSelectionRectangle.Visibility = Visibility.Visible;
+        PreviewSelectionRectangle.Width = _previewSelectionDip.Width;
+        PreviewSelectionRectangle.Height = _previewSelectionDip.Height;
+        Canvas.SetLeft(PreviewSelectionRectangle, _previewSelectionDip.X);
+        Canvas.SetTop(PreviewSelectionRectangle, _previewSelectionDip.Y);
+        NotifyPreviewSelectionStateChanged();
+    }
+
+    private bool CropCurrentFrame()
+    {
+        if (!CanCropCurrentFrame
+            || CurrentFrameImage is null
+            || SelectedFrameIndex < 0
+            || SelectedFrameIndex >= Frames.Count)
+        {
+            return false;
+        }
+
+        StopPlayback();
+
+        var pixelRect = ImageSelectionHelper.ToPixelRect(_previewSelectionDip, CurrentFrameImage);
+        if (pixelRect.IsEmpty || pixelRect.Width <= 0 || pixelRect.Height <= 0)
+        {
+            return false;
+        }
+
+        var cropped = new CroppedBitmap(CurrentFrameImage, pixelRect);
+        cropped.Freeze();
+
+        var currentFrame = Frames[SelectedFrameIndex];
+        Frames[SelectedFrameIndex] = new AnimationFrame(currentFrame.Name, cropped);
+        ThumbnailList.SelectedIndex = SelectedFrameIndex;
+
+        ClearPreviewSelection();
+        OnPropertyChanged(nameof(CurrentFrameImage));
+        OnPropertyChanged(nameof(CurrentFrameSummary));
+
+        if (!_suppressDirtyTracking)
+        {
+            MarkDirty();
+        }
+
+        return true;
+    }
+
     private void AddFramesFromPaths(IEnumerable<string> paths)
     {
         foreach (var path in paths)
@@ -318,6 +405,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             return;
         }
+
+        ClearPreviewSelection();
 
         var removedIndex = SelectedFrameIndex;
         Frames.RemoveAt(removedIndex);
@@ -479,6 +568,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         var modifiers = Keyboard.Modifiers;
 
+        if (modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && key == Key.X)
+        {
+            CropCurrentFrame();
+            e.Handled = true;
+            return;
+        }
+
         if (modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && key == Key.S)
         {
             TrySaveProject(forceSaveAs: true);
@@ -631,6 +727,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         TrySaveProject(forceSaveAs: true);
     }
 
+    private void CropMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        CropCurrentFrame();
+    }
+
     private void OptionsMenuItem_Click(object sender, RoutedEventArgs e)
     {
         var optionsWindow = new OptionsWindow
@@ -656,6 +757,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         try
         {
             StopPlayback();
+            ClearPreviewSelection();
             Frames.Clear();
             IsLoopEnabled = false;
             SelectedFrameIndex = -1;
@@ -712,6 +814,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             try
             {
                 StopPlayback();
+                ClearPreviewSelection();
                 Frames.Clear();
                 foreach (var frame in loadResult.Frames)
                 {
@@ -892,6 +995,64 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             ThumbnailList.SelectedIndex = NormalizeSelection(SelectedFrameIndex);
         }
+    }
+
+    private void PreviewOverlayCanvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (CurrentFrameImage is null
+            || PreviewOverlayCanvas.ActualWidth <= 0
+            || PreviewOverlayCanvas.ActualHeight <= 0)
+        {
+            return;
+        }
+
+        StopPlayback();
+        Focus();
+
+        _isPreviewDragging = true;
+        _previewDragStartPoint = e.GetPosition(PreviewOverlayCanvas);
+        _previewSelectionDip = new Rect(_previewDragStartPoint, _previewDragStartPoint);
+        PreviewOverlayCanvas.CaptureMouse();
+        UpdatePreviewSelectionVisual();
+        e.Handled = true;
+    }
+
+    private void PreviewOverlayCanvas_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_isPreviewDragging || CurrentFrameImage is null)
+        {
+            return;
+        }
+
+        var currentPoint = e.GetPosition(PreviewOverlayCanvas);
+        _previewSelectionDip = ImageSelectionHelper.NormalizeRect(_previewDragStartPoint, currentPoint);
+        UpdatePreviewSelectionVisual();
+        e.Handled = true;
+    }
+
+    private void PreviewOverlayCanvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_isPreviewDragging)
+        {
+            return;
+        }
+
+        _isPreviewDragging = false;
+        PreviewOverlayCanvas.ReleaseMouseCapture();
+
+        var currentPoint = e.GetPosition(PreviewOverlayCanvas);
+        _previewSelectionDip = ImageSelectionHelper.NormalizeRect(_previewDragStartPoint, currentPoint);
+
+        if (!HasValidPreviewSelection(_previewSelectionDip))
+        {
+            ClearPreviewSelection();
+        }
+        else
+        {
+            UpdatePreviewSelectionVisual();
+        }
+
+        e.Handled = true;
     }
 
     private void ThumbnailList_PreviewDragOver(object sender, DragEventArgs e)
