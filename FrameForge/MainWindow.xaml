@@ -367,6 +367,7 @@
                                 Width="1"
                                 Height="1"
                                 Background="Transparent"
+                                Focusable="True"
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Top"
                                 MouseLeftButtonDown="PreviewOverlayCanvas_MouseLeftButtonDown"

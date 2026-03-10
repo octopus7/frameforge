@@ -520,6 +520,41 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         SelectedFrameIndex = next;
     }
 
+    private bool TryMoveCurrentFrameByArrowKey(Key key)
+    {
+        var currentFrame = CurrentFrame;
+        if (currentFrame is null)
+        {
+            return false;
+        }
+
+        var (deltaX, deltaY) = key switch
+        {
+            Key.Left => (-1, 0),
+            Key.Right => (1, 0),
+            Key.Up => (0, -1),
+            Key.Down => (0, 1),
+            _ => (0, 0)
+        };
+
+        if (deltaX == 0 && deltaY == 0)
+        {
+            return false;
+        }
+
+        StopPlayback();
+        Frames[SelectedFrameIndex] = currentFrame.WithPosition(currentFrame.X + deltaX, currentFrame.Y + deltaY);
+        ThumbnailList.SelectedIndex = SelectedFrameIndex;
+        RefreshCurrentFrameState(includeImageProperty: false);
+
+        if (!_suppressDirtyTracking)
+        {
+            MarkDirty();
+        }
+
+        return true;
+    }
+
     private void RemoveSelectedFrame()
     {
         if (!HasFrames || SelectedFrameIndex < 0 || SelectedFrameIndex >= Frames.Count)
@@ -741,6 +776,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             && key == Key.V
             && (ThumbnailList.IsKeyboardFocusWithin || ThumbnailList.IsMouseOver)
             && PasteClipboardImagesAfterSelection())
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (PreviewOverlayCanvas.IsKeyboardFocusWithin && TryMoveCurrentFrameByArrowKey(key))
         {
             e.Handled = true;
             return;
@@ -1151,7 +1192,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         StopPlayback();
-        Focus();
+        Keyboard.Focus(PreviewOverlayCanvas);
 
         var startPoint = e.GetPosition(PreviewOverlayCanvas);
         if (!_previewLayout.CanvasRect.Contains(startPoint))
