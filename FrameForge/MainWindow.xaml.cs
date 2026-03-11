@@ -520,7 +520,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         SelectedFrameIndex = next;
     }
 
-    private bool TryMoveCurrentFrameByArrowKey(Key key)
+    private bool TryMoveCurrentFrameByArrowKey(Key key, ModifierKeys modifiers)
     {
         var currentFrame = CurrentFrame;
         if (currentFrame is null)
@@ -528,12 +528,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return false;
         }
 
+        var step = (modifiers & ModifierKeys.Control) == ModifierKeys.Control ? 10 : 1;
         var (deltaX, deltaY) = key switch
         {
-            Key.Left => (-1, 0),
-            Key.Right => (1, 0),
-            Key.Up => (0, -1),
-            Key.Down => (0, 1),
+            Key.Left => (-step, 0),
+            Key.Right => (step, 0),
+            Key.Up => (0, -step),
+            Key.Down => (0, step),
             _ => (0, 0)
         };
 
@@ -781,7 +782,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return;
         }
 
-        if (PreviewOverlayCanvas.IsKeyboardFocusWithin && TryMoveCurrentFrameByArrowKey(key))
+        if (PreviewOverlayCanvas.IsKeyboardFocusWithin && TryMoveCurrentFrameByArrowKey(key, modifiers))
         {
             e.Handled = true;
             return;
