@@ -782,7 +782,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return;
         }
 
-        if (PreviewOverlayCanvas.IsKeyboardFocusWithin && TryMoveCurrentFrameByArrowKey(key, modifiers))
+        if (PreviewOverlayCanvas.IsMouseOver && TryMoveCurrentFrameByArrowKey(key, modifiers))
         {
             e.Handled = true;
             return;
@@ -1193,7 +1193,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         StopPlayback();
-        Keyboard.Focus(PreviewOverlayCanvas);
+        Focus();
 
         var startPoint = e.GetPosition(PreviewOverlayCanvas);
         if (!_previewLayout.CanvasRect.Contains(startPoint))
