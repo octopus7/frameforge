@@ -325,10 +325,17 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         if (!HasCanvas || _previewLayout.CanvasRect.IsEmpty)
         {
+            PreviewCanvasHost.Visibility = Visibility.Collapsed;
             PreviewCanvasBounds.Visibility = Visibility.Collapsed;
         }
         else
         {
+            PreviewCanvasHost.Visibility = Visibility.Visible;
+            PreviewCanvasHost.Width = _previewLayout.CanvasRect.Width;
+            PreviewCanvasHost.Height = _previewLayout.CanvasRect.Height;
+            Canvas.SetLeft(PreviewCanvasHost, _previewLayout.CanvasRect.X);
+            Canvas.SetTop(PreviewCanvasHost, _previewLayout.CanvasRect.Y);
+
             PreviewCanvasBounds.Visibility = Visibility.Visible;
             PreviewCanvasBounds.Width = _previewLayout.CanvasRect.Width;
             PreviewCanvasBounds.Height = _previewLayout.CanvasRect.Height;
@@ -350,8 +357,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         PreviewFrameImage.Visibility = Visibility.Visible;
         PreviewFrameImage.Width = currentFrameImage.PixelWidth;
         PreviewFrameImage.Height = currentFrameImage.PixelHeight;
-        Canvas.SetLeft(PreviewFrameImage, _previewLayout.FrameRect.X);
-        Canvas.SetTop(PreviewFrameImage, _previewLayout.FrameRect.Y);
+        Canvas.SetLeft(PreviewFrameImage, _previewLayout.FrameRect.X - _previewLayout.CanvasRect.X);
+        Canvas.SetTop(PreviewFrameImage, _previewLayout.FrameRect.Y - _previewLayout.CanvasRect.Y);
     }
 
     private int InsertFrameAtIndex(int insertionIndex, BitmapSource image, string? name = null, string? sourcePath = null)

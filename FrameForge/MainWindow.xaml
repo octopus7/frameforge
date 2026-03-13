@@ -377,18 +377,26 @@
                                                 ScaleY="{Binding ZoomFactor}" />
                             </Canvas.LayoutTransform>
 
+                            <Canvas x:Name="PreviewCanvasHost"
+                                    Width="1"
+                                    Height="1"
+                                    Visibility="Collapsed"
+                                    Background="{StaticResource Brush.SurfaceBackground}"
+                                    ClipToBounds="True"
+                                    SnapsToDevicePixels="True">
+                                <Image x:Name="PreviewFrameImage"
+                                       Visibility="Collapsed"
+                                       Stretch="None"
+                                       SnapsToDevicePixels="True"
+                                       UseLayoutRounding="True" />
+                            </Canvas>
+
                             <Rectangle x:Name="PreviewCanvasBounds"
                                        Visibility="Collapsed"
-                                       Fill="{StaticResource Brush.SurfaceBackground}"
+                                       Fill="Transparent"
                                        Stroke="{StaticResource Brush.BorderStrong}"
                                        StrokeThickness="1"
                                        SnapsToDevicePixels="True" />
-
-                            <Image x:Name="PreviewFrameImage"
-                                   Visibility="Collapsed"
-                                   Stretch="None"
-                                   SnapsToDevicePixels="True"
-                                   UseLayoutRounding="True" />
 
                             <Rectangle x:Name="PreviewSelectionRectangle"
                                        Visibility="Collapsed"

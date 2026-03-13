@@ -17,40 +17,34 @@ internal static class CanvasLayoutHelper
 
     public static CanvasViewportLayout CalculateViewport(int canvasWidth, int canvasHeight, AnimationFrame? currentFrame, double padding = PreviewPadding)
     {
-        var canvasRect = canvasWidth > 0 && canvasHeight > 0
-            ? new Rect(0, 0, canvasWidth, canvasHeight)
-            : Rect.Empty;
-        var frameRect = currentFrame is null
-            ? Rect.Empty
-            : new Rect(currentFrame.X, currentFrame.Y, currentFrame.Image.PixelWidth, currentFrame.Image.PixelHeight);
-
-        var contentBounds = canvasRect;
-        if (!frameRect.IsEmpty)
+        if (canvasWidth > 0 && canvasHeight > 0)
         {
-            contentBounds = contentBounds.IsEmpty ? frameRect : Rect.Union(contentBounds, frameRect);
+            var canvasRect = new Rect(padding, padding, canvasWidth, canvasHeight);
+            var frameRect = currentFrame is null
+                ? Rect.Empty
+                : new Rect(
+                    canvasRect.X + currentFrame.X,
+                    canvasRect.Y + currentFrame.Y,
+                    currentFrame.Image.PixelWidth,
+                    currentFrame.Image.PixelHeight);
+
+            return new CanvasViewportLayout(
+                Math.Max(1, canvasWidth + (padding * 2)),
+                Math.Max(1, canvasHeight + (padding * 2)),
+                canvasRect,
+                frameRect);
         }
 
-        if (contentBounds.IsEmpty)
+        if (currentFrame is null)
         {
             return CanvasViewportLayout.Empty;
         }
 
-        contentBounds.Inflate(padding, padding);
-        var offsetX = -contentBounds.Left;
-        var offsetY = -contentBounds.Top;
-
-        var translatedCanvasRect = canvasRect.IsEmpty
-            ? Rect.Empty
-            : new Rect(canvasRect.Left + offsetX, canvasRect.Top + offsetY, canvasRect.Width, canvasRect.Height);
-        var translatedFrameRect = frameRect.IsEmpty
-            ? Rect.Empty
-            : new Rect(frameRect.Left + offsetX, frameRect.Top + offsetY, frameRect.Width, frameRect.Height);
-
         return new CanvasViewportLayout(
-            Math.Max(1, contentBounds.Width),
-            Math.Max(1, contentBounds.Height),
-            translatedCanvasRect,
-            translatedFrameRect);
+            Math.Max(1, currentFrame.Image.PixelWidth + (padding * 2)),
+            Math.Max(1, currentFrame.Image.PixelHeight + (padding * 2)),
+            Rect.Empty,
+            new Rect(padding, padding, currentFrame.Image.PixelWidth, currentFrame.Image.PixelHeight));
     }
 
     public static Int32Rect ClampSelectionToCanvas(Rect selectionRect, Rect canvasRect, int canvasWidth, int canvasHeight)

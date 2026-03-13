@@ -31,16 +31,16 @@ public sealed class CanvasLayoutHelperTests
     }
 
     [Fact]
-    public void CalculateViewport_IncludesCanvasAndOverflowFrame()
+    public void CalculateViewport_AnchorsCanvasAndOffsetsFrame()
     {
         var frame = new AnimationFrame("frame", CreateBitmap(20, 10), -3, 4);
 
         var viewport = CanvasLayoutHelper.CalculateViewport(16, 12, frame);
 
-        Assert.Equal(60, viewport.WorkspaceWidth);
-        Assert.Equal(54, viewport.WorkspaceHeight);
-        Assert.Equal(new Rect(23, 20, 16, 12), viewport.CanvasRect);
-        Assert.Equal(new Rect(20, 24, 20, 10), viewport.FrameRect);
+        Assert.Equal(56, viewport.WorkspaceWidth);
+        Assert.Equal(52, viewport.WorkspaceHeight);
+        Assert.Equal(new Rect(20, 20, 16, 12), viewport.CanvasRect);
+        Assert.Equal(new Rect(17, 24, 20, 10), viewport.FrameRect);
     }
 
     [Fact]
