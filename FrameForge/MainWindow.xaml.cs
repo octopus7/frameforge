@@ -44,6 +44,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string? _currentProjectPath;
     private bool _isDirty;
     private bool _suppressDirtyTracking;
+    private bool _isReplacingFrames;
 
     public MainWindow()
     {
@@ -77,6 +78,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         get => _selectedFrameIndex;
         set
         {
+            if (_isReplacingFrames && value < 0)
+            {
+                return;
+            }
+
             var normalized = NormalizeSelection(value);
             if (_selectedFrameIndex == normalized)
             {
@@ -361,6 +367,30 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Canvas.SetTop(PreviewFrameImage, _previewLayout.FrameRect.Y - _previewLayout.CanvasRect.Y);
     }
 
+    private void ReplaceFramesPreservingSelection(Action replaceAction)
+    {
+        ArgumentNullException.ThrowIfNull(replaceAction);
+
+        var preservedSelectedIndex = SelectedFrameIndex;
+        _isReplacingFrames = true;
+
+        try
+        {
+            replaceAction();
+        }
+        finally
+        {
+            _isReplacingFrames = false;
+        }
+
+        if (preservedSelectedIndex >= 0
+            && preservedSelectedIndex < Frames.Count
+            && ThumbnailList.SelectedIndex != preservedSelectedIndex)
+        {
+            ThumbnailList.SelectedIndex = preservedSelectedIndex;
+        }
+    }
+
     private int InsertFrameAtIndex(int insertionIndex, BitmapSource image, string? name = null, string? sourcePath = null)
     {
         var frameName = string.IsNullOrWhiteSpace(name) ? $"Frame_{Frames.Count + 1:000}" : name;
@@ -471,10 +501,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         var shiftedFrames = CanvasLayoutHelper.OffsetFrames(Frames, -pixelRect.X, -pixelRect.Y);
-        for (var i = 0; i < shiftedFrames.Count; i++)
+        ReplaceFramesPreservingSelection(() =>
         {
-            Frames[i] = shiftedFrames[i];
-        }
+            for (var i = 0; i < shiftedFrames.Count; i++)
+            {
+                Frames[i] = shiftedFrames[i];
+            }
+        });
 
         SetCanvasSize(pixelRect.Width, pixelRect.Height);
         ThumbnailList.SelectedIndex = SelectedFrameIndex;
@@ -551,7 +584,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         StopPlayback();
-        Frames[SelectedFrameIndex] = currentFrame.WithPosition(currentFrame.X + deltaX, currentFrame.Y + deltaY);
+        ReplaceFramesPreservingSelection(() =>
+        {
+            Frames[SelectedFrameIndex] = currentFrame.WithPosition(currentFrame.X + deltaX, currentFrame.Y + deltaY);
+        });
         ThumbnailList.SelectedIndex = SelectedFrameIndex;
         RefreshCurrentFrameState(includeImageProperty: false);
 
