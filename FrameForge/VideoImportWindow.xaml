@@ -210,8 +210,9 @@
                                     Click="CropFramesButton_Click"
                                     Content="크롭" />
                             <Button BorderThickness="0,0,1,0"
-                                    IsEnabled="False"
-                                    Content="" />
+                                    IsEnabled="{Binding CanInvertSelection}"
+                                    Click="InvertSelectionButton_Click"
+                                    Content="선택 반전" />
                             <Button BorderThickness="0"
                                     IsEnabled="False"
                                     Content="" />

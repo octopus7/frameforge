@@ -14,6 +14,7 @@ namespace FrameForge;
 public sealed class VideoImportFrameItem : INotifyPropertyChanged
 {
     private string _displayName;
+    private string _outputName;
     private BitmapSource _image;
     private bool _isActive;
 
@@ -22,6 +23,7 @@ public sealed class VideoImportFrameItem : INotifyPropertyChanged
         SourceIndex = sourceIndex;
         Timestamp = timestamp;
         _displayName = displayName;
+        _outputName = displayName;
         _image = image;
     }
 
@@ -81,6 +83,26 @@ public sealed class VideoImportFrameItem : INotifyPropertyChanged
     public void SetDisplayName(string displayName)
     {
         DisplayName = displayName;
+    }
+
+    public string OutputName
+    {
+        get => _outputName;
+        private set
+        {
+            if (string.Equals(_outputName, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _outputName = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public void SetOutputName(string outputName)
+    {
+        OutputName = outputName;
     }
 
     public void SetImage(BitmapSource image)
@@ -367,13 +389,8 @@ public sealed class VideoImportSession : INotifyPropertyChanged
         ActiveFrameIndex = clickedIndex;
     }
 
-    public void SyncActiveFrame(IReadOnlyList<int> selectedIndices)
+    public void SyncActiveFrame(IReadOnlyList<int> selectedIndices, int preferredIndex = -1)
     {
-        if (HasActiveFrame)
-        {
-            return;
-        }
-
         if (Frames.Count == 0)
         {
             ActiveFrameIndex = -1;
@@ -382,11 +399,54 @@ public sealed class VideoImportSession : INotifyPropertyChanged
         }
 
         var normalizedSelection = NormalizeSelectionIndices(selectedIndices);
-        ActiveFrameIndex = normalizedSelection.Count > 0 ? normalizedSelection[0] : 0;
+        if (normalizedSelection.Count == 1)
+        {
+            ActiveFrameIndex = normalizedSelection[0];
+            SelectionAnchorIndex = normalizedSelection[0];
+            return;
+        }
+
+        if (preferredIndex >= 0
+            && preferredIndex < Frames.Count
+            && (normalizedSelection.Count == 0 || normalizedSelection.Contains(preferredIndex)))
+        {
+            ActiveFrameIndex = preferredIndex;
+            if (normalizedSelection.Count <= 1)
+            {
+                SelectionAnchorIndex = preferredIndex;
+            }
+
+            return;
+        }
+
+        if (normalizedSelection.Count > 0)
+        {
+            if (!normalizedSelection.Contains(ActiveFrameIndex))
+            {
+                ActiveFrameIndex = normalizedSelection[0];
+            }
+
+            if (SelectionAnchorIndex < 0)
+            {
+                SelectionAnchorIndex = ActiveFrameIndex;
+            }
+
+            return;
+        }
+
+        ActiveFrameIndex = HasActiveFrame ? ActiveFrameIndex : 0;
         if (SelectionAnchorIndex < 0)
         {
             SelectionAnchorIndex = ActiveFrameIndex;
         }
+    }
+
+    public List<int> GetInvertedSelection(IReadOnlyList<int> selectedIndices)
+    {
+        var normalizedSelection = NormalizeSelectionIndices(selectedIndices);
+        return Enumerable.Range(0, Frames.Count)
+            .Except(normalizedSelection)
+            .ToList();
     }
 
     public bool RemoveFrames(IReadOnlyList<int> selectedIndices)
@@ -481,7 +541,7 @@ public sealed class VideoImportSession : INotifyPropertyChanged
         }
 
         var frames = Frames
-            .Select(frame => new VideoImportFrameResult(frame.DisplayName, frame.Image))
+            .Select(frame => new VideoImportFrameResult(frame.OutputName, frame.Image))
             .ToArray();
         return new VideoImportResult(SourceVideoPath, frames);
     }
@@ -504,7 +564,8 @@ public sealed class VideoImportSession : INotifyPropertyChanged
     {
         for (var i = 0; i < Frames.Count; i++)
         {
-            Frames[i].SetDisplayName($"{SourceVideoStem}_{i + 1:0000}");
+            Frames[i].SetDisplayName($"프레임 {i + 1}");
+            Frames[i].SetOutputName($"{SourceVideoStem}_{i + 1:0000}");
         }
     }
 

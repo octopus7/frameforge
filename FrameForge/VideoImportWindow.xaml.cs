@@ -62,6 +62,8 @@ public partial class VideoImportWindow : Window, INotifyPropertyChanged
 
     public bool CanCropFrames => !Session.IsLoading && Session.HasFrames && Session.HasCropSelection;
 
+    public bool CanInvertSelection => !Session.IsLoading && Session.HasFrames;
+
     public bool CanConfirmImport => !Session.IsLoading && Session.HasFrames;
 
     public string ActiveFrameSummary =>
@@ -199,7 +201,7 @@ public partial class VideoImportWindow : Window, INotifyPropertyChanged
         }
         else
         {
-            Session.SyncActiveFrame(selectedIndices);
+            Session.SyncActiveFrame(selectedIndices, GetSelectionLeadIndex(selectedIndices));
         }
 
         _pendingClickedFrameIndex = null;
@@ -227,6 +229,11 @@ public partial class VideoImportWindow : Window, INotifyPropertyChanged
         Session.ApplyCrop(pixelRect);
         UpdateCropSelectionVisual();
         RefreshDerivedState();
+    }
+
+    private void InvertSelectionButton_Click(object sender, RoutedEventArgs e)
+    {
+        InvertSelection();
     }
 
     private void ConfirmButton_Click(object sender, RoutedEventArgs e)
@@ -341,38 +348,31 @@ public partial class VideoImportWindow : Window, INotifyPropertyChanged
         return true;
     }
 
+    private bool InvertSelection()
+    {
+        if (!CanInvertSelection)
+        {
+            return false;
+        }
+
+        var invertedSelection = Session.GetInvertedSelection(GetSelectedIndices());
+        ApplyListSelection(invertedSelection);
+        Session.SyncActiveFrame(invertedSelection, Session.ActiveFrameIndex);
+        ScrollActiveFrameIntoView();
+        RefreshDerivedState();
+        return true;
+    }
+
     private void SelectActiveFrame()
     {
-        _suppressSelectionSync = true;
-        try
-        {
-            FrameList.UnselectAll();
-            if (Session.ActiveFrameIndex >= 0)
-            {
-                FrameList.SelectedIndex = Session.ActiveFrameIndex;
-                if (FrameList.SelectedItem is object selectedItem)
-                {
-                    FrameList.ScrollIntoView(selectedItem);
-                }
-            }
-        }
-        finally
-        {
-            _suppressSelectionSync = false;
-        }
+        var selection = Session.ActiveFrameIndex >= 0 ? new[] { Session.ActiveFrameIndex } : [];
+        ApplyListSelection(selection);
+        ScrollActiveFrameIntoView();
     }
 
     private void ClearListSelection()
     {
-        _suppressSelectionSync = true;
-        try
-        {
-            FrameList.UnselectAll();
-        }
-        finally
-        {
-            _suppressSelectionSync = false;
-        }
+        ApplyListSelection([]);
     }
 
     private List<int> GetSelectedIndices()
@@ -383,6 +383,62 @@ public partial class VideoImportWindow : Window, INotifyPropertyChanged
             .Where(index => index >= 0)
             .OrderBy(index => index)
             .ToList();
+    }
+
+    private int GetSelectionLeadIndex(IReadOnlyList<int> selectedIndices)
+    {
+        var currentIndex = FrameList.Items.CurrentPosition;
+        if (currentIndex >= 0 && currentIndex < Session.Frames.Count)
+        {
+            return currentIndex;
+        }
+
+        if (FrameList.SelectedItem is VideoImportFrameItem selectedFrame)
+        {
+            var selectedIndex = Session.Frames.IndexOf(selectedFrame);
+            if (selectedIndex >= 0)
+            {
+                return selectedIndex;
+            }
+        }
+
+        return selectedIndices.Count > 0 ? selectedIndices[0] : -1;
+    }
+
+    private void ApplyListSelection(IReadOnlyList<int> selectedIndices)
+    {
+        _suppressSelectionSync = true;
+        try
+        {
+            FrameList.UnselectAll();
+            foreach (var selectedIndex in selectedIndices)
+            {
+                if (selectedIndex >= 0 && selectedIndex < FrameList.Items.Count)
+                {
+                    FrameList.SelectedItems.Add(FrameList.Items[selectedIndex]);
+                }
+            }
+
+            if (selectedIndices.Count > 0)
+            {
+                FrameList.Items.MoveCurrentToPosition(selectedIndices[^1]);
+            }
+        }
+        finally
+        {
+            _suppressSelectionSync = false;
+        }
+    }
+
+    private void ScrollActiveFrameIntoView()
+    {
+        if (Session.ActiveFrameIndex < 0 || Session.ActiveFrameIndex >= FrameList.Items.Count)
+        {
+            return;
+        }
+
+        FrameList.Items.MoveCurrentToPosition(Session.ActiveFrameIndex);
+        FrameList.ScrollIntoView(FrameList.Items[Session.ActiveFrameIndex]);
     }
 
     private void UpdateCropSelectionVisual()
@@ -468,6 +524,7 @@ public partial class VideoImportWindow : Window, INotifyPropertyChanged
         OnPropertyChanged(nameof(HasSelectedFrames));
         OnPropertyChanged(nameof(CanDeleteFrames));
         OnPropertyChanged(nameof(CanCropFrames));
+        OnPropertyChanged(nameof(CanInvertSelection));
         OnPropertyChanged(nameof(CanConfirmImport));
         OnPropertyChanged(nameof(ActiveFrameSummary));
     }

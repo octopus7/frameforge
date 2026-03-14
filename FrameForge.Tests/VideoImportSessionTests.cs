@@ -44,7 +44,39 @@ public sealed class VideoImportSessionTests
         Assert.True(removed);
         Assert.Equal(2, session.Frames.Count);
         Assert.Equal(1, session.ActiveFrameIndex);
-        Assert.Equal(["sample_0001", "sample_0002"], session.Frames.Select(frame => frame.DisplayName).ToArray());
+        Assert.Equal(["프레임 1", "프레임 2"], session.Frames.Select(frame => frame.DisplayName).ToArray());
+        Assert.Equal(["sample_0001", "sample_0002"], session.Frames.Select(frame => frame.OutputName).ToArray());
+    }
+
+    [Fact]
+    public void SyncActiveFrame_UsesPreferredIndexForKeyboardNavigation()
+    {
+        var session = CreateSession(frameCount: 4);
+        session.SetActiveFrameIndex(0);
+
+        session.SyncActiveFrame([2], preferredIndex: 2);
+
+        Assert.Equal(2, session.ActiveFrameIndex);
+    }
+
+    [Fact]
+    public void CreateResult_UsesInternalOutputNames()
+    {
+        var session = CreateSession(frameCount: 2);
+
+        var result = session.CreateResult();
+
+        Assert.Equal(["sample_0001", "sample_0002"], result.Frames.Select(frame => frame.Name).ToArray());
+    }
+
+    [Fact]
+    public void GetInvertedSelection_ReturnsUnselectedFrameIndices()
+    {
+        var session = CreateSession(frameCount: 5);
+
+        var invertedSelection = session.GetInvertedSelection([1, 3]);
+
+        Assert.Equal([0, 2, 4], invertedSelection);
     }
 
     [Fact]
