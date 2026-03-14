@@ -17,6 +17,7 @@ public sealed class VideoImportFrameItem : INotifyPropertyChanged
     private string _outputName;
     private BitmapSource _image;
     private bool _isActive;
+    private bool _isChecked = true;
 
     public VideoImportFrameItem(int sourceIndex, TimeSpan timestamp, string displayName, BitmapSource image)
     {
@@ -74,6 +75,21 @@ public sealed class VideoImportFrameItem : INotifyPropertyChanged
             }
 
             _isActive = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public bool IsChecked
+    {
+        get => _isChecked;
+        set
+        {
+            if (_isChecked == value)
+            {
+                return;
+            }
+
+            _isChecked = value;
             OnPropertyChanged();
         }
     }
@@ -447,6 +463,26 @@ public sealed class VideoImportSession : INotifyPropertyChanged
         return Enumerable.Range(0, Frames.Count)
             .Except(normalizedSelection)
             .ToList();
+    }
+
+    public List<int> GetUncheckedFrameIndices()
+    {
+        return Frames
+            .Select((frame, index) => new { frame, index })
+            .Where(item => !item.frame.IsChecked)
+            .Select(item => item.index)
+            .ToList();
+    }
+
+    public void SetCheckedState(IReadOnlyList<int> frameIndices, bool isChecked)
+    {
+        foreach (var frameIndex in NormalizeSelectionIndices(frameIndices))
+        {
+            if (frameIndex >= 0 && frameIndex < Frames.Count)
+            {
+                Frames[frameIndex].IsChecked = isChecked;
+            }
+        }
     }
 
     public bool RemoveFrames(IReadOnlyList<int> selectedIndices)

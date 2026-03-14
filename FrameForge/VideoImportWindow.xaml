@@ -134,12 +134,26 @@
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
                                         <Grid Margin="10,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="Auto" />
                                                 <RowDefinition Height="Auto" />
                                             </Grid.RowDefinitions>
 
-                                            <TextBlock Text="{Binding DisplayName}"
+                                            <CheckBox Grid.RowSpan="2"
+                                                      Margin="0,0,10,0"
+                                                      VerticalAlignment="Center"
+                                                      Focusable="False"
+                                                      IsChecked="{Binding IsChecked}"
+                                                      PreviewMouseLeftButtonDown="FrameCheckBox_PreviewMouseLeftButtonDown"
+                                                      Checked="FrameCheckBox_CheckChanged"
+                                                      Unchecked="FrameCheckBox_CheckChanged" />
+
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding DisplayName}"
                                                        FontSize="13"
                                                        FontWeight="SemiBold"
                                                        TextTrimming="CharacterEllipsis">
@@ -156,6 +170,7 @@
                                             </TextBlock>
 
                                             <TextBlock Grid.Row="1"
+                                                       Grid.Column="1"
                                                        Margin="0,4,0,0"
                                                        Text="{Binding Subtitle}"
                                                        Foreground="{StaticResource Brush.TextMuted}"
@@ -206,13 +221,13 @@
                                     Click="DeleteFramesButton_Click"
                                     Content="삭제" />
                             <Button BorderThickness="0,0,1,0"
-                                    IsEnabled="{Binding CanCropFrames}"
-                                    Click="CropFramesButton_Click"
-                                    Content="크롭" />
-                            <Button BorderThickness="0,0,1,0"
                                     IsEnabled="{Binding CanInvertSelection}"
                                     Click="InvertSelectionButton_Click"
                                     Content="선택 반전" />
+                            <Button BorderThickness="0,0,1,0"
+                                    IsEnabled="{Binding CanDeleteUncheckedFrames}"
+                                    Click="DeleteUncheckedFramesButton_Click"
+                                    Content="미체크프레임삭제" />
                             <Button BorderThickness="0"
                                     IsEnabled="False"
                                     Content="" />
@@ -232,16 +247,32 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Row="0" Margin="14,12,14,10">
-                        <TextBlock Text="액티브 프레임"
-                                   FontSize="14"
-                                   FontWeight="SemiBold"
-                                   Foreground="{StaticResource Brush.TextPrimary}" />
-                        <TextBlock Margin="0,4,0,0"
-                                   Text="{Binding ActiveFrameSummary}"
-                                   Foreground="{StaticResource Brush.TextMuted}"
-                                   TextTrimming="CharacterEllipsis" />
-                    </StackPanel>
+                    <Grid Grid.Row="0" Margin="14,12,14,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="액티브 프레임"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource Brush.TextPrimary}" />
+                            <TextBlock Margin="0,4,0,0"
+                                       Text="{Binding ActiveFrameSummary}"
+                                       Foreground="{StaticResource Brush.TextMuted}"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+
+                        <Button Grid.Column="1"
+                                MinWidth="92"
+                                Height="32"
+                                Margin="12,0,0,0"
+                                VerticalAlignment="Top"
+                                IsEnabled="{Binding CanCropFrames}"
+                                Click="CropFramesButton_Click"
+                                Content="크롭" />
+                    </Grid>
 
                     <Grid Grid.Row="1">
                         <ScrollViewer HorizontalScrollBarVisibility="Auto"

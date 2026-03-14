@@ -64,6 +64,8 @@ public partial class VideoImportWindow : Window, INotifyPropertyChanged
 
     public bool CanInvertSelection => !Session.IsLoading && Session.HasFrames;
 
+    public bool CanDeleteUncheckedFrames => !Session.IsLoading && Session.Frames.Any(frame => !frame.IsChecked);
+
     public bool CanConfirmImport => !Session.IsLoading && Session.HasFrames;
 
     public string ActiveFrameSummary =>
@@ -163,6 +165,12 @@ public partial class VideoImportWindow : Window, INotifyPropertyChanged
 
     private void FrameList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (FindAncestor<CheckBox>(e.OriginalSource as DependencyObject) is not null)
+        {
+            _pendingClickedFrameIndex = null;
+            return;
+        }
+
         if (!FrameList.IsKeyboardFocusWithin)
         {
             Keyboard.Focus(FrameList);
@@ -211,6 +219,11 @@ public partial class VideoImportWindow : Window, INotifyPropertyChanged
     private void DeleteFramesButton_Click(object sender, RoutedEventArgs e)
     {
         DeleteSelectedFrames();
+    }
+
+    private void DeleteUncheckedFramesButton_Click(object sender, RoutedEventArgs e)
+    {
+        DeleteUncheckedFrames();
     }
 
     private void CropFramesButton_Click(object sender, RoutedEventArgs e)
@@ -336,8 +349,17 @@ public partial class VideoImportWindow : Window, INotifyPropertyChanged
 
     private bool DeleteSelectedFrames()
     {
-        var selectedIndices = GetSelectedIndices();
-        if (!Session.RemoveFrames(selectedIndices))
+        return DeleteFrames(GetSelectedIndices());
+    }
+
+    private bool DeleteUncheckedFrames()
+    {
+        return DeleteFrames(Session.GetUncheckedFrameIndices());
+    }
+
+    private bool DeleteFrames(IReadOnlyList<int> frameIndices)
+    {
+        if (!Session.RemoveFrames(frameIndices))
         {
             return false;
         }
@@ -428,6 +450,37 @@ public partial class VideoImportWindow : Window, INotifyPropertyChanged
         {
             _suppressSelectionSync = false;
         }
+    }
+
+    private void FrameCheckBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not CheckBox checkBox || checkBox.DataContext is not VideoImportFrameItem frame)
+        {
+            return;
+        }
+
+        var targetCheckedState = !frame.IsChecked;
+        var selectedIndices = GetSelectedIndices();
+        var clickedFrameIndex = Session.Frames.IndexOf(frame);
+
+        if (selectedIndices.Count > 1 && selectedIndices.Contains(clickedFrameIndex))
+        {
+            Session.SetCheckedState(selectedIndices, targetCheckedState);
+        }
+        else if (clickedFrameIndex >= 0)
+        {
+            Session.SetCheckedState([clickedFrameIndex], targetCheckedState);
+        }
+
+        _pendingClickedFrameIndex = null;
+        RefreshDerivedState();
+        e.Handled = true;
+    }
+
+    private void FrameCheckBox_CheckChanged(object sender, RoutedEventArgs e)
+    {
+        RefreshDerivedState();
+        e.Handled = true;
     }
 
     private void ScrollActiveFrameIntoView()
@@ -525,6 +578,7 @@ public partial class VideoImportWindow : Window, INotifyPropertyChanged
         OnPropertyChanged(nameof(CanDeleteFrames));
         OnPropertyChanged(nameof(CanCropFrames));
         OnPropertyChanged(nameof(CanInvertSelection));
+        OnPropertyChanged(nameof(CanDeleteUncheckedFrames));
         OnPropertyChanged(nameof(CanConfirmImport));
         OnPropertyChanged(nameof(ActiveFrameSummary));
     }

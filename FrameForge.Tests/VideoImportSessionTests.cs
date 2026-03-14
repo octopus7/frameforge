@@ -80,6 +80,38 @@ public sealed class VideoImportSessionTests
     }
 
     [Fact]
+    public void RemoveFrames_UsingUncheckedFrameIndices_RemovesOnlyUncheckedFrames()
+    {
+        var session = CreateSession(frameCount: 4);
+        session.SetActiveFrameIndex(2);
+        session.Frames[1].IsChecked = false;
+        session.Frames[3].IsChecked = false;
+
+        var removed = session.RemoveFrames(session.GetUncheckedFrameIndices());
+
+        Assert.True(removed);
+        Assert.Equal(2, session.Frames.Count);
+        Assert.Equal(["프레임 1", "프레임 2"], session.Frames.Select(frame => frame.DisplayName).ToArray());
+        Assert.Equal(["sample_0001", "sample_0002"], session.Frames.Select(frame => frame.OutputName).ToArray());
+        Assert.All(session.Frames, frame => Assert.True(frame.IsChecked));
+    }
+
+    [Fact]
+    public void SetCheckedState_AppliesTargetStateToAllSelectedFrames()
+    {
+        var session = CreateSession(frameCount: 5);
+        session.Frames[1].IsChecked = false;
+
+        session.SetCheckedState([1, 2, 3], true);
+
+        Assert.True(session.Frames[1].IsChecked);
+        Assert.True(session.Frames[2].IsChecked);
+        Assert.True(session.Frames[3].IsChecked);
+        Assert.True(session.Frames[0].IsChecked);
+        Assert.True(session.Frames[4].IsChecked);
+    }
+
+    [Fact]
     public void CropSelection_RequiresMinimumSize()
     {
         var session = CreateSession(frameCount: 2);
