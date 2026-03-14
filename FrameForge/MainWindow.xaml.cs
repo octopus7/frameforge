@@ -28,6 +28,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private readonly DispatcherTimer _playbackTimer;
     private SpriteSheetImportWindow? _sheetImportWindow;
+    private VideoImportWindow? _videoImportWindow;
     private int _selectedFrameIndex = -1;
     private int _canvasWidth;
     private int _canvasHeight;
@@ -1206,9 +1207,45 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _sheetImportWindow.Show();
     }
 
+    private void ImportVideoMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (_videoImportWindow is { IsLoaded: true })
+        {
+            _videoImportWindow.Activate();
+            _videoImportWindow.Focus();
+            return;
+        }
+
+        _videoImportWindow = new VideoImportWindow(OnVideoFramesImported)
+        {
+            Owner = this
+        };
+        _videoImportWindow.Closed += (_, _) => _videoImportWindow = null;
+        _videoImportWindow.Show();
+    }
+
     private void OnSheetFrameCaptured(BitmapSource frame)
     {
         AddFrame(frame, $"Sheet_{Frames.Count + 1:000}", focusAddedFrame: true);
+    }
+
+    private void OnVideoFramesImported(VideoImportResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        var insertionIndex = SelectedFrameIndex >= 0 ? SelectedFrameIndex + 1 : Frames.Count;
+        var lastInsertedIndex = -1;
+
+        foreach (var frame in result.Frames)
+        {
+            lastInsertedIndex = InsertFrameAtIndex(insertionIndex, frame.Image, frame.Name, result.SourceVideoPath);
+            insertionIndex = lastInsertedIndex + 1;
+        }
+
+        if (lastInsertedIndex >= 0)
+        {
+            SelectedFrameIndex = lastInsertedIndex;
+        }
     }
 
     private void ThumbnailList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1393,6 +1430,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         StopPlayback();
         _sheetImportWindow?.Close();
+        _videoImportWindow?.Close();
         base.OnClosed(e);
     }
 

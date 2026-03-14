@@ -10,6 +10,8 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        VideoDecoderRuntime.Configure();
+
         var mainWindow = new MainWindow();
         MainWindow = mainWindow;
         mainWindow.Show();

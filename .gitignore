@@ -64,6 +64,7 @@ BenchmarkDotNet.Artifacts/
 project.lock.json
 project.fragment.lock.json
 artifacts/
+FrameForge/runtimes/win-x64/native/*.dll
 
 # Tye
 .tye/

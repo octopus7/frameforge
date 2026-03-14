@@ -331,6 +331,8 @@
                 <Separator />
                 <MenuItem Header="단일 이미지에서 시트 가져오기"
                           Click="ImportSingleImageSheetMenuItem_Click" />
+                <MenuItem Header="동영상에서 프레임 가져오기"
+                          Click="ImportVideoMenuItem_Click" />
                 <Separator />
                 <MenuItem Header="옵션..."
                           Click="OptionsMenuItem_Click" />
