@@ -954,11 +954,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void OptionsMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        var optionsWindow = new OptionsWindow
-        {
-            Owner = this
-        };
-        optionsWindow.ShowDialog();
+        ShowOptionsWindow();
     }
 
     private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
@@ -1207,8 +1203,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _sheetImportWindow.Show();
     }
 
-    private void ImportVideoMenuItem_Click(object sender, RoutedEventArgs e)
+    private async void ImportVideoMenuItem_Click(object sender, RoutedEventArgs e)
     {
+        if (!await VideoRuntimeSetupCoordinator.EnsureRuntimeAvailableAsync(this))
+        {
+            return;
+        }
+
         if (_videoImportWindow is { IsLoaded: true })
         {
             _videoImportWindow.Activate();
@@ -1222,6 +1223,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         };
         _videoImportWindow.Closed += (_, _) => _videoImportWindow = null;
         _videoImportWindow.Show();
+    }
+
+    private void ShowOptionsWindow(OptionsWindowTab initialTab = OptionsWindowTab.FileAssociation)
+    {
+        var optionsWindow = new OptionsWindow(initialTab)
+        {
+            Owner = this
+        };
+        optionsWindow.ShowDialog();
     }
 
     private void OnSheetFrameCaptured(BitmapSource frame)

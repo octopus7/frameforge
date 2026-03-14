@@ -83,12 +83,8 @@ public partial class VideoImportWindow : Window, INotifyPropertyChanged
             return;
         }
 
-        if (!VideoDecoderRuntime.TryEnsureLoaded(out var errorMessage))
+        if (!await VideoRuntimeSetupCoordinator.EnsureRuntimeAvailableAsync(this))
         {
-            Session.FailLoading(errorMessage ?? "FFmpeg 런타임을 초기화할 수 없습니다.");
-            LoadProgressText = "동영상 파일을 선택하세요.";
-            RefreshDerivedState();
-            MessageBox.Show(this, Session.LoadError, "동영상 불러오기", MessageBoxButton.OK, MessageBoxImage.Error);
             return;
         }
 
