@@ -329,10 +329,17 @@
                           InputGestureText="Ctrl+Shift+S"
                           Click="SaveProjectAsMenuItem_Click" />
                 <Separator />
-                <MenuItem Header="단일 이미지에서 시트 가져오기"
-                          Click="ImportSingleImageSheetMenuItem_Click" />
-                <MenuItem Header="동영상에서 프레임 가져오기"
-                          Click="ImportVideoMenuItem_Click" />
+                <MenuItem Header="가져오기">
+                    <MenuItem Header="단일 이미지에서 시트 가져오기"
+                              Click="ImportSingleImageSheetMenuItem_Click" />
+                    <MenuItem Header="동영상에서 프레임 가져오기"
+                              Click="ImportVideoMenuItem_Click" />
+                </MenuItem>
+                <MenuItem Header="익스포트">
+                    <MenuItem Header="PNG 시퀀스"
+                              IsEnabled="{Binding HasFrames}"
+                              Click="ExportPngSequenceMenuItem_Click" />
+                </MenuItem>
                 <Separator />
                 <MenuItem Header="옵션..."
                           Click="OptionsMenuItem_Click" />
@@ -346,6 +353,11 @@
                           InputGestureText="Ctrl+Shift+X"
                           IsEnabled="{Binding CanCropCanvas}"
                           Click="CropMenuItem_Click" />
+            </MenuItem>
+
+            <MenuItem Header="Tools">
+                <MenuItem Header="Make AniGIF"
+                          Click="MakeAniGifMenuItem_Click" />
             </MenuItem>
         </Menu>
 

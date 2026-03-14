@@ -29,6 +29,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly DispatcherTimer _playbackTimer;
     private SpriteSheetImportWindow? _sheetImportWindow;
     private VideoImportWindow? _videoImportWindow;
+    private string? _lastPngSequenceExportDirectory;
+    private string? _lastPngSequenceExportPrefix;
     private int _selectedFrameIndex = -1;
     private int _canvasWidth;
     private int _canvasHeight;
@@ -947,9 +949,23 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         TrySaveProject(forceSaveAs: true);
     }
 
+    private void ExportPngSequenceMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        ExportPngSequence();
+    }
+
     private void CropMenuItem_Click(object sender, RoutedEventArgs e)
     {
         CropCurrentCanvas();
+    }
+
+    private void MakeAniGifMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var makeAniGifWindow = new MakeAniGifWindow
+        {
+            Owner = this
+        };
+        makeAniGifWindow.ShowDialog();
     }
 
     private void OptionsMenuItem_Click(object sender, RoutedEventArgs e)
@@ -1225,6 +1241,84 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _videoImportWindow.Show();
     }
 
+    private void ExportPngSequence()
+    {
+        if (!HasFrames)
+        {
+            return;
+        }
+
+        var exportWindow = new PngSequenceExportWindow(
+            GetDefaultPngSequenceExportDirectory(),
+            GetDefaultPngSequenceExportPrefix())
+        {
+            Owner = this
+        };
+
+        if (exportWindow.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var targetPaths = PngSequenceExportService.GetTargetPaths(
+                exportWindow.ExportDirectory,
+                exportWindow.FilePrefix,
+                Frames.Count);
+            var hasExistingFiles = false;
+
+            foreach (var targetPath in targetPaths)
+            {
+                if (File.Exists(targetPath))
+                {
+                    hasExistingFiles = true;
+                    break;
+                }
+            }
+
+            if (hasExistingFiles)
+            {
+                var overwriteResult = MessageBox.Show(
+                    this,
+                    "같은 이름의 PNG 파일이 이미 있습니다. 덮어쓰시겠습니까?",
+                    "PNG 시퀀스 익스포트",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning,
+                    MessageBoxResult.No);
+
+                if (overwriteResult != MessageBoxResult.Yes)
+                {
+                    return;
+                }
+            }
+
+            var exportResult = PngSequenceExportService.Export(
+                exportWindow.ExportDirectory,
+                exportWindow.FilePrefix,
+                Frames);
+
+            _lastPngSequenceExportDirectory = exportResult.OutputDirectory;
+            _lastPngSequenceExportPrefix = exportResult.FilePrefix;
+
+            MessageBox.Show(
+                this,
+                $"{exportResult.FileCount}개의 PNG 파일을 내보냈습니다.\n{exportResult.OutputDirectory}",
+                "PNG 시퀀스 익스포트",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                this,
+                $"PNG 시퀀스를 내보낼 수 없습니다.\n{ex.Message}",
+                "PNG 시퀀스 익스포트",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
     private void ShowOptionsWindow(OptionsWindowTab initialTab = OptionsWindowTab.FileAssociation)
     {
         var optionsWindow = new OptionsWindow(initialTab)
@@ -1256,6 +1350,45 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             SelectedFrameIndex = lastInsertedIndex;
         }
+    }
+
+    private string GetDefaultPngSequenceExportDirectory()
+    {
+        if (!string.IsNullOrWhiteSpace(_lastPngSequenceExportDirectory))
+        {
+            return _lastPngSequenceExportDirectory;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_currentProjectPath))
+        {
+            var projectDirectory = Path.GetDirectoryName(_currentProjectPath);
+            if (!string.IsNullOrWhiteSpace(projectDirectory))
+            {
+                return projectDirectory;
+            }
+        }
+
+        return Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+    }
+
+    private string GetDefaultPngSequenceExportPrefix()
+    {
+        if (!string.IsNullOrWhiteSpace(_lastPngSequenceExportPrefix))
+        {
+            return _lastPngSequenceExportPrefix;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_currentProjectPath))
+        {
+            var projectStem = Path.GetFileNameWithoutExtension(_currentProjectPath);
+            var sanitizedProjectStem = PngSequenceExportService.SanitizePrefix(projectStem);
+            if (!string.IsNullOrWhiteSpace(sanitizedProjectStem))
+            {
+                return sanitizedProjectStem;
+            }
+        }
+
+        return "frame";
     }
 
     private void ThumbnailList_SelectionChanged(object sender, SelectionChangedEventArgs e)
